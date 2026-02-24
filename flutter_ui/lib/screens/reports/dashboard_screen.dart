@@ -4,7 +4,6 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/report_provider.dart';
-import '../../widgets/app_drawer.dart';
 import '../../widgets/loading_widget.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -27,7 +26,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Báo cáo')),
-      drawer: const AppDrawer(),
       body: reportState.isLoading
           ? const LoadingWidget()
           : RefreshIndicator(

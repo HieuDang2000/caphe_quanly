@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/app_theme.dart';
 import '../../providers/layout_provider.dart';
-import '../../widgets/app_drawer.dart';
 import '../../widgets/loading_widget.dart';
 
 class LayoutEditorScreen extends ConsumerStatefulWidget {
@@ -128,7 +127,6 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
           ),
         ],
       ),
-      drawer: const AppDrawer(),
       body: Column(
         children: [
           if (layoutState.floors.isNotEmpty)

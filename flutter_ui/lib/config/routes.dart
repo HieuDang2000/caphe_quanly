@@ -15,6 +15,7 @@ import '../screens/staff/staff_screen.dart';
 import '../screens/inventory/inventory_screen.dart';
 import '../screens/customers/customer_screen.dart';
 import '../screens/reservations/reservation_screen.dart';
+import '../widgets/app_shell.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -30,29 +31,34 @@ GoRouter createRouter(bool isLoggedIn) {
     },
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
-      GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
-      GoRoute(path: '/layout', builder: (_, _) => const LayoutEditorScreen()),
-      GoRoute(path: '/menu', builder: (_, _) => const MenuListScreen()),
-      GoRoute(
-        path: '/menu/form',
-        builder: (_, state) => MenuFormScreen(item: state.extra as Map<String, dynamic>?),
+      ShellRoute(
+        builder: (context, state, child) => AppShell(child: child),
+        routes: [
+          GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
+          GoRoute(path: '/layout', builder: (_, _) => const LayoutEditorScreen()),
+          GoRoute(path: '/menu', builder: (_, _) => const MenuListScreen()),
+          GoRoute(
+            path: '/menu/form',
+            builder: (_, state) => MenuFormScreen(item: state.extra as Map<String, dynamic>?),
+          ),
+          GoRoute(path: '/orders', builder: (_, _) => const OrderScreen()),
+          GoRoute(path: '/orders/list', builder: (_, _) => const OrderListScreen()),
+          GoRoute(
+            path: '/invoice/:orderId',
+            builder: (_, state) => InvoiceScreen(orderId: int.parse(state.pathParameters['orderId']!)),
+          ),
+          GoRoute(
+            path: '/payment/:invoiceId',
+            builder: (_, state) => PaymentScreen(invoiceId: int.parse(state.pathParameters['invoiceId']!)),
+          ),
+          GoRoute(path: '/reports', builder: (_, _) => const DashboardScreen()),
+          GoRoute(path: '/users', builder: (_, _) => const UserManagementScreen()),
+          GoRoute(path: '/staff', builder: (_, _) => const StaffScreen()),
+          GoRoute(path: '/inventory', builder: (_, _) => const InventoryScreen()),
+          GoRoute(path: '/customers', builder: (_, _) => const CustomerScreen()),
+          GoRoute(path: '/reservations', builder: (_, _) => const ReservationScreen()),
+        ],
       ),
-      GoRoute(path: '/orders', builder: (_, _) => const OrderScreen()),
-      GoRoute(path: '/orders/list', builder: (_, _) => const OrderListScreen()),
-      GoRoute(
-        path: '/invoice/:orderId',
-        builder: (_, state) => InvoiceScreen(orderId: int.parse(state.pathParameters['orderId']!)),
-      ),
-      GoRoute(
-        path: '/payment/:invoiceId',
-        builder: (_, state) => PaymentScreen(invoiceId: int.parse(state.pathParameters['invoiceId']!)),
-      ),
-      GoRoute(path: '/reports', builder: (_, _) => const DashboardScreen()),
-      GoRoute(path: '/users', builder: (_, _) => const UserManagementScreen()),
-      GoRoute(path: '/staff', builder: (_, _) => const StaffScreen()),
-      GoRoute(path: '/inventory', builder: (_, _) => const InventoryScreen()),
-      GoRoute(path: '/customers', builder: (_, _) => const CustomerScreen()),
-      GoRoute(path: '/reservations', builder: (_, _) => const ReservationScreen()),
     ],
   );
 }

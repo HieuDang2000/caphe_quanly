@@ -4,7 +4,6 @@ import '../../config/app_theme.dart';
 import '../../core/network/api_client.dart';
 import '../../config/api_config.dart';
 import '../../core/utils/formatters.dart';
-import '../../widgets/app_drawer.dart';
 import '../../widgets/loading_widget.dart';
 
 final staffListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -52,7 +51,6 @@ class _StaffScreenState extends ConsumerState<StaffScreen> with SingleTickerProv
           ],
         ),
       ),
-      drawer: const AppDrawer(),
       body: TabBarView(
         controller: _tabController,
         children: [

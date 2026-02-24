@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/menu_provider.dart';
-import '../../widgets/app_drawer.dart';
 import '../../widgets/loading_widget.dart';
 
 class MenuListScreen extends ConsumerStatefulWidget {
@@ -35,11 +34,10 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
           IconButton(
             icon: const Icon(Icons.category),
             tooltip: 'Quản lý danh mục',
-            onPressed: () => _showCategoryDialog(),
+            onPressed: () => _showCategoryManagement(),
           ),
         ],
       ),
-      drawer: const AppDrawer(),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/menu/form'),
         child: const Icon(Icons.add),
@@ -114,6 +112,75 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
     );
   }
 
+  void _showCategoryManagement() {
+    final menuState = ref.read(menuProvider);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollController) => Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Quản lý danh mục', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showCategoryDialog();
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Thêm danh mục'),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 0),
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: menuState.categories.length,
+                itemBuilder: (_, index) {
+                  final cat = menuState.categories[index];
+                  final count = cat['menu_items_count'] as int?;
+                  return ListTile(
+                    title: Text(cat['name'] ?? ''),
+                    subtitle: count != null ? Text('$count món') : null,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showCategoryDialog(category: cat);
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: AppTheme.errorColor),
+                          onPressed: () {
+                            _confirmDeleteCategory(cat);
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showCategoryDialog({Map<String, dynamic>? category}) {
     final nameController = TextEditingController(text: category?['name'] ?? '');
     final descController = TextEditingController(text: category?['description'] ?? '');
@@ -141,6 +208,37 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
               if (success && mounted) Navigator.pop(context);
             },
             child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteCategory(Map<String, dynamic> category) {
+    final count = category['menu_items_count'] as int? ?? 0;
+    final nav = Navigator.of(context);
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Xóa danh mục'),
+        content: Text(
+          count > 0
+              ? 'Danh mục "${category['name']}" có $count món. Xóa danh mục sẽ xóa luôn tất cả món trong đó. Bạn có chắc muốn xóa?'
+              : 'Bạn có chắc muốn xóa danh mục "${category['name']}"?',
+        ),
+        actions: [
+          TextButton(onPressed: () => nav.pop(), child: const Text('Hủy')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            onPressed: () async {
+              nav.pop();
+              final success = await ref.read(menuProvider.notifier).deleteCategory(category['id'] as int);
+              if (success && mounted) {
+                nav.pop();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã xóa danh mục')));
+              }
+            },
+            child: const Text('Xóa'),
           ),
         ],
       ),

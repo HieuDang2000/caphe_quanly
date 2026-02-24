@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/app_theme.dart';
 import '../../core/network/api_client.dart';
 import '../../config/api_config.dart';
-import '../../widgets/app_drawer.dart';
 import '../../widgets/loading_widget.dart';
 
 final userListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -21,7 +20,6 @@ class UserManagementScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Quản lý Users')),
-      drawer: const AppDrawer(),
       body: usersAsync.when(
         loading: () => const LoadingWidget(),
         error: (e, _) => Center(child: Text('Lỗi: $e')),

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/app_theme.dart';
 import '../../core/network/api_client.dart';
 import '../../config/api_config.dart';
-import '../../widgets/app_drawer.dart';
 import '../../widgets/loading_widget.dart';
 
 final customerListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -39,7 +38,6 @@ class CustomerScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Khách hàng thân thiết')),
-      drawer: const AppDrawer(),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addCustomerDialog(context, ref),
         child: const Icon(Icons.person_add),

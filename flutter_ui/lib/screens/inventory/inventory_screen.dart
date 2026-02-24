@@ -4,7 +4,6 @@ import '../../config/app_theme.dart';
 import '../../core/network/api_client.dart';
 import '../../config/api_config.dart';
 import '../../core/utils/formatters.dart';
-import '../../widgets/app_drawer.dart';
 import '../../widgets/loading_widget.dart';
 
 final inventoryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -31,7 +30,6 @@ class InventoryScreen extends ConsumerWidget {
           ),
         ],
       ),
-      drawer: const AppDrawer(),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addItemDialog(context, ref),
         child: const Icon(Icons.add),

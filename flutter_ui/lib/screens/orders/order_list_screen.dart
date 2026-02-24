@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/order_provider.dart';
-import '../../widgets/app_drawer.dart';
 import '../../widgets/loading_widget.dart';
 
 class OrderListScreen extends ConsumerStatefulWidget {
@@ -71,7 +70,6 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
           ),
         ],
       ),
-      drawer: const AppDrawer(),
       body: orderState.isLoading
           ? const LoadingWidget()
           : RefreshIndicator(

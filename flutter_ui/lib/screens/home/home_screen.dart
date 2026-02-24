@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/app_drawer.dart';
-
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -16,7 +14,6 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Coffee Shop Manager')),
-      drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

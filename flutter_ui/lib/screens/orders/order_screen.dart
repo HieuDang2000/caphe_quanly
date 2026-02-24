@@ -7,7 +7,6 @@ import '../../core/utils/formatters.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/menu_provider.dart';
 import '../../providers/layout_provider.dart';
-import '../../widgets/app_drawer.dart';
 import '../../widgets/loading_widget.dart';
 
 class OrderScreen extends ConsumerStatefulWidget {
@@ -57,7 +56,6 @@ class _OrderScreenState extends ConsumerState<OrderScreen> with SingleTickerProv
           ],
         ),
       ),
-      drawer: const AppDrawer(),
       body: TabBarView(
         controller: _tabController,
         children: [

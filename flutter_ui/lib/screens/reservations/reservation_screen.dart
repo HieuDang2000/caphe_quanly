@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import '../../config/app_theme.dart';
 import '../../core/network/api_client.dart';
 import '../../config/api_config.dart';
-import '../../widgets/app_drawer.dart';
 import '../../widgets/loading_widget.dart';
 
 final reservationListProvider = FutureProvider.family<List<Map<String, dynamic>>, String?>((ref, date) async {
@@ -52,7 +51,6 @@ class _ReservationScreenState extends ConsumerState<ReservationScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Đặt bàn')),
-      drawer: const AppDrawer(),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addReservationDialog(),
         child: const Icon(Icons.add),
