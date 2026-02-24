@@ -37,7 +37,7 @@ class DatabaseSeeder extends Seeder
                 'type' => 'table',
                 'name' => "Bàn $i",
                 'position_x' => (($i - 1) % 4) * 150 + 50,
-                'position_y' => (int)(($i - 1) / 4) * 150 + 50,
+                'position_y' => (int) (($i - 1) / 4) * 150 + 50,
                 'width' => 80,
                 'height' => 80,
                 'properties' => ['seats' => 4, 'shape' => 'square'],
@@ -50,7 +50,7 @@ class DatabaseSeeder extends Seeder
                 'type' => 'table',
                 'name' => "Bàn $i",
                 'position_x' => (($i - 9) % 3) * 180 + 50,
-                'position_y' => (int)(($i - 9) / 3) * 180 + 50,
+                'position_y' => (int) (($i - 9) / 3) * 180 + 50,
                 'width' => 100,
                 'height' => 100,
                 'properties' => ['seats' => 6, 'shape' => 'round'],
@@ -61,8 +61,9 @@ class DatabaseSeeder extends Seeder
         $coffee = Category::create(['name' => 'Cà phê', 'sort_order' => 1]);
         $hotDrinks = Category::create(['name' => 'Món nóng', 'sort_order' => 2]);
         $yogurtBlended = Category::create(['name' => 'Sữa chua & Đá xay', 'sort_order' => 3]);
-        $milkTea = Category::create(['name' => 'Trà sữa', 'sort_order' => 5]);
-        $fruitTea = Category::create(['name' => 'Trà trái cây', 'sort_order' => 6]);
+        $milkTea = Category::create(['name' => 'Trà sữa', 'sort_order' => 4]);
+        $fruitTea = Category::create(['name' => 'Trà trái cây', 'sort_order' => 5]);
+        $snacks = Category::create(['name' => 'Ăn vặt', 'sort_order' => 6]);
 
         // Danh mục Cà phê
         $coffeeItems = [
@@ -93,11 +94,11 @@ class DatabaseSeeder extends Seeder
 
         // Danh mục Sữa chua & Đá xay
         $yogurtBlendedItems = [
-            ['name' => 'Sữa chua đá xay Truyền', 'price' => 28000],
-            ['name' => 'Sữa chua đá xay Việt quất', 'price' => 28000],
-            ['name' => 'Sữa chua đá xay Xoài', 'price' => 28000],
-            ['name' => 'Sữa chua đá xay Đào', 'price' => 28000],
-            ['name' => 'Sữa chua đá xay Kiwi', 'price' => 28000],
+            ['name' => 'Sữa chua đá xay ', 'price' => 28000],
+            ['name' => 'Sữa chua đá xay việt quất', 'price' => 28000],
+            ['name' => 'Sữa chua đá xay xoài', 'price' => 28000],
+            ['name' => 'Sữa chua đá xay đào', 'price' => 28000],
+            ['name' => 'Sữa chua đá xay kiwi', 'price' => 28000],
             ['name' => 'Matcha đá xay', 'price' => 30000],
             ['name' => 'Chocolate đá xay', 'price' => 30000],
         ];
@@ -111,8 +112,13 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Trà chanh hạt chia nha đam', 'price' => 20000],
             ['name' => 'Trà dâu tằm', 'price' => 22000],
             ['name' => 'Trà tắc mật ong nha đam', 'price' => 22000],
-            ['name' => 'Trà xoài / Đào cam xả / Ổi', 'price' => 25000],
-            ['name' => 'Trà măng cụt tằm đặc / Vải hạt chia / Dưa lưới / Nho kiwi', 'price' => 27000],
+            ['name' => 'Trà xoài', 'price' => 25000],
+            ['name' => 'Trà đào cam xả', 'price' => 25000],
+            ['name' => 'Trà ổi', 'price' => 25000],
+            ['name' => 'Trà măng cụt tằm đặc', 'price' => 27000],
+            ['name' => 'Trà vải hạt chia', 'price' => 27000],
+            ['name' => 'Trà dưa lưới', 'price' => 27000],
+            ['name' => 'Trà nho kiwi', 'price' => 27000],
             ['name' => 'Trà trái cây nhiệt đới', 'price' => 30000],
         ];
         foreach ($fruitTeaItems as $idx => $item) {
@@ -135,18 +141,37 @@ class DatabaseSeeder extends Seeder
         ];
         foreach ($milkTeaItems as $idx => $item) {
             MenuItem::create(array_merge($item, ['category_id' => $milkTea->id, 'sort_order' => $idx + 1]));
+
+            // Menu item options (Size L milk tea)
+            $milkTeaItem = MenuItem::where('name', $item['name'])->first();
+            if ($milkTeaItem) {
+                MenuItemOption::create(['menu_item_id' => $milkTeaItem->id, 'name' => 'Size L', 'extra_price' => 5000]);
+            }
         }
 
-        // Menu item options (Size L milk tea)
-        $traDao = MenuItem::where('name', 'Trà đào')->first();
-        if ($traDao) {
-            MenuItemOption::create(['menu_item_id' => $traDao->id, 'name' => 'Size L', 'extra_price' => 5000]);
+        // Danh mục Ăn vặt
+        $snackItems = [
+            ['name' => 'Combo 5 (Cá / Bò / Tôm / Cá cốm / Cá phô mai)', 'price' => 28000],
+            ['name' => 'Combo 7 (Thêm ốc và xúc xích)', 'price' => 38000],
+            ['name' => 'Combo 10 (Đầy đủ các loại viên, xúc xích, phô mai que, khoai lang kén, hồ lô...)', 'price' => 48000],
+            ['name' => 'Cá viên', 'price' => 10000],
+            ['name' => 'Bò viên', 'price' => 10000],
+            ['name' => 'Tôm viên', 'price' => 10000],
+            ['name' => 'Ốc viên', 'price' => 10000],
+            ['name' => 'Phô mai que', 'price' => 10000],
+            ['name' => 'Xúc xích', 'price' => 10000],
+            ['name' => 'Xúc xích hồ lô', 'price' => 12000],
+            ['name' => 'Xúc xích phô mai (Hotdog)', 'price' => 15000],
+            ['name' => 'Khoai tây chiên', 'price' => 15000],
+            ['name' => 'Khoai lang kén', 'price' => 15000],
+            ['name' => 'Cá sốt phô mai', 'price' => 15000],
+            ['name' => 'Cá tẩm cốm', 'price' => 15000],
+            ['name' => 'Chả cá rau răm', 'price' => 15000],
+            ['name' => 'Bánh tráng trộn', 'price' => 15000],
+        ];
+        foreach ($snackItems as $idx => $item) {
+            MenuItem::create(array_merge($item, ['category_id' => $snacks->id, 'sort_order' => $idx + 1]));
         }
-        
-
-        // Sample customers
-        Customer::create(['name' => 'Nguyễn Văn A', 'phone' => '0912345678', 'email' => 'nva@email.com', 'points' => 150]);
-        Customer::create(['name' => 'Trần Thị B', 'phone' => '0987654321', 'email' => 'ttb@email.com', 'points' => 600, 'tier' => 'silver']);
 
         // Inventory items
         $inventoryData = [
