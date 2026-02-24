@@ -185,15 +185,18 @@ class OrderNotifier extends StateNotifier<OrderState> {
   }
 
   Future<void> loadOrders({String? status, String? date}) async {
+    if (!mounted) return;
     state = state.copyWith(isLoading: true);
     try {
       final params = <String, dynamic>{};
       if (status != null) params['status'] = status;
       if (date != null) params['date'] = date;
       final res = await _api.get(ApiConfig.orders, queryParameters: params);
+      if (!mounted) return;
       final data = res.data is Map ? res.data['data'] : res.data;
       state = state.copyWith(orders: List<Map<String, dynamic>>.from(data), isLoading: false);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -201,6 +204,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
   Future<void> loadActiveOrders() async {
     try {
       final res = await _api.get(ApiConfig.activeOrders);
+      if (!mounted) return;
       state = state.copyWith(activeOrders: List<Map<String, dynamic>>.from(res.data));
     } catch (_) {}
   }
@@ -217,7 +221,9 @@ class OrderNotifier extends StateNotifier<OrderState> {
 
   void startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => loadActiveOrders());
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) loadActiveOrders();
+    });
     loadActiveOrders();
   }
 

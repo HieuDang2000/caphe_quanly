@@ -59,66 +59,90 @@ class DatabaseSeeder extends Seeder
 
         // Categories & Menu Items
         $coffee = Category::create(['name' => 'Cà phê', 'sort_order' => 1]);
-        $tea = Category::create(['name' => 'Trà', 'sort_order' => 2]);
-        $juice = Category::create(['name' => 'Nước ép', 'sort_order' => 3]);
-        $food = Category::create(['name' => 'Đồ ăn nhẹ', 'sort_order' => 4]);
+        $hotDrinks = Category::create(['name' => 'Món nóng', 'sort_order' => 2]);
+        $yogurtBlended = Category::create(['name' => 'Sữa chua & Đá xay', 'sort_order' => 3]);
+        $milkTea = Category::create(['name' => 'Trà sữa', 'sort_order' => 5]);
+        $fruitTea = Category::create(['name' => 'Trà trái cây', 'sort_order' => 6]);
 
+        // Danh mục Cà phê
         $coffeeItems = [
-            ['name' => 'Cà phê đen', 'price' => 25000],
-            ['name' => 'Cà phê sữa', 'price' => 30000],
-            ['name' => 'Bạc xỉu', 'price' => 32000],
-            ['name' => 'Cappuccino', 'price' => 45000],
-            ['name' => 'Latte', 'price' => 45000],
-            ['name' => 'Espresso', 'price' => 35000],
-            ['name' => 'Americano', 'price' => 40000],
-            ['name' => 'Mocha', 'price' => 50000],
+            ['name' => 'Cà phê đen phin', 'price' => 13000],
+            ['name' => 'Cà phê sữa phin', 'price' => 15000],
+            ['name' => 'Cà phê đen ép máy', 'price' => 16000],
+            ['name' => 'Cà phê sữa ép máy', 'price' => 18000],
+            ['name' => 'Cà phê muối', 'price' => 18000],
+            ['name' => 'Cà phê kem trứng', 'price' => 20000],
+            ['name' => 'Cà phê cốt dừa', 'price' => 20000],
+            ['name' => 'Bạc xỉu', 'price' => 22000],
+            ['name' => 'Cacao đá', 'price' => 25000],
         ];
         foreach ($coffeeItems as $idx => $item) {
             MenuItem::create(array_merge($item, ['category_id' => $coffee->id, 'sort_order' => $idx + 1]));
         }
 
-        $teaItems = [
-            ['name' => 'Trà đào', 'price' => 35000],
-            ['name' => 'Trà vải', 'price' => 35000],
-            ['name' => 'Trà chanh', 'price' => 25000],
-            ['name' => 'Trà xanh matcha', 'price' => 45000],
-            ['name' => 'Trà ô long', 'price' => 30000],
+        // Danh mục Món nóng
+        $hotDrinkItems = [
+            ['name' => 'Sữa nóng', 'price' => 18000],
+            ['name' => 'Bạc xỉu nóng', 'price' => 22000],
+            ['name' => 'Cacao nóng', 'price' => 25000],
+            ['name' => 'Trà gừng mật ong', 'price' => 18000],
         ];
-        foreach ($teaItems as $idx => $item) {
-            MenuItem::create(array_merge($item, ['category_id' => $tea->id, 'sort_order' => $idx + 1]));
+        foreach ($hotDrinkItems as $idx => $item) {
+            MenuItem::create(array_merge($item, ['category_id' => $hotDrinks->id, 'sort_order' => $idx + 1]));
         }
 
-        $juiceItems = [
-            ['name' => 'Nước ép cam', 'price' => 35000],
-            ['name' => 'Nước ép dưa hấu', 'price' => 30000],
-            ['name' => 'Sinh tố bơ', 'price' => 40000],
-            ['name' => 'Sinh tố xoài', 'price' => 38000],
+        // Danh mục Sữa chua & Đá xay
+        $yogurtBlendedItems = [
+            ['name' => 'Sữa chua đá xay Truyền', 'price' => 28000],
+            ['name' => 'Sữa chua đá xay Việt quất', 'price' => 28000],
+            ['name' => 'Sữa chua đá xay Xoài', 'price' => 28000],
+            ['name' => 'Sữa chua đá xay Đào', 'price' => 28000],
+            ['name' => 'Sữa chua đá xay Kiwi', 'price' => 28000],
+            ['name' => 'Matcha đá xay', 'price' => 30000],
+            ['name' => 'Chocolate đá xay', 'price' => 30000],
         ];
-        foreach ($juiceItems as $idx => $item) {
-            MenuItem::create(array_merge($item, ['category_id' => $juice->id, 'sort_order' => $idx + 1]));
+        foreach ($yogurtBlendedItems as $idx => $item) {
+            MenuItem::create(array_merge($item, ['category_id' => $yogurtBlended->id, 'sort_order' => $idx + 1]));
         }
 
-        $foodItems = [
-            ['name' => 'Bánh mì', 'price' => 25000],
-            ['name' => 'Croissant', 'price' => 30000],
-            ['name' => 'Bánh flan', 'price' => 20000],
-            ['name' => 'Khoai tây chiên', 'price' => 35000],
+        // Danh mục Trà Trái Cây (Fruit Tea)
+        $fruitTeaItems = [
+            ['name' => 'Trà chanh', 'price' => 15000],
+            ['name' => 'Trà chanh hạt chia nha đam', 'price' => 20000],
+            ['name' => 'Trà dâu tằm', 'price' => 22000],
+            ['name' => 'Trà tắc mật ong nha đam', 'price' => 22000],
+            ['name' => 'Trà xoài / Đào cam xả / Ổi', 'price' => 25000],
+            ['name' => 'Trà măng cụt tằm đặc / Vải hạt chia / Dưa lưới / Nho kiwi', 'price' => 27000],
+            ['name' => 'Trà trái cây nhiệt đới', 'price' => 30000],
         ];
-        foreach ($foodItems as $idx => $item) {
-            MenuItem::create(array_merge($item, ['category_id' => $food->id, 'sort_order' => $idx + 1]));
+        foreach ($fruitTeaItems as $idx => $item) {
+            MenuItem::create(array_merge($item, ['category_id' => $fruitTea->id, 'sort_order' => $idx + 1]));
         }
 
-        // Menu item options (Size L, Trân châu, etc.)
+        // Danh mục Trà sữa (giá là size M, size L cao hơn)
+        $milkTeaItems = [
+            ['name' => 'Trà sữa truyền thống', 'price' => 18000],
+            ['name' => 'Trà sữa lài', 'price' => 18000],
+            ['name' => 'Trà sữa trân châu đường đen', 'price' => 18000],
+            ['name' => 'Trà sữa thái xanh matcha', 'price' => 20000],
+            ['name' => 'Trà sữa kem machiato', 'price' => 20000],
+            ['name' => 'Trà sữa kem trứng vụn dừa', 'price' => 23000],
+            ['name' => 'Trà sữa matcha machiato', 'price' => 23000],
+            ['name' => 'Trà sữa khoai môn phết', 'price' => 23000],
+            ['name' => 'Trà sữa Phô mai phết', 'price' => 23000],
+            ['name' => 'Sữa tươi trân châu đường đen', 'price' => 18000],
+            ['name' => 'Matcha latte', 'price' => 18000],
+        ];
+        foreach ($milkTeaItems as $idx => $item) {
+            MenuItem::create(array_merge($item, ['category_id' => $milkTea->id, 'sort_order' => $idx + 1]));
+        }
+
+        // Menu item options (Size L milk tea)
         $traDao = MenuItem::where('name', 'Trà đào')->first();
         if ($traDao) {
             MenuItemOption::create(['menu_item_id' => $traDao->id, 'name' => 'Size L', 'extra_price' => 5000]);
-            MenuItemOption::create(['menu_item_id' => $traDao->id, 'name' => 'Trân châu thêm', 'extra_price' => 4000]);
         }
-        $caPheSua = MenuItem::where('name', 'Cà phê sữa')->first();
-        if ($caPheSua) {
-            MenuItemOption::create(['menu_item_id' => $caPheSua->id, 'name' => 'Size L', 'extra_price' => 5000]);
-            MenuItemOption::create(['menu_item_id' => $caPheSua->id, 'name' => 'Trân châu thêm', 'extra_price' => 4000]);
-        }
+        
 
         // Sample customers
         Customer::create(['name' => 'Nguyễn Văn A', 'phone' => '0912345678', 'email' => 'nva@email.com', 'points' => 150]);

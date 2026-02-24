@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #333; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "DejaVu Sans", sans-serif; font-size: 12px; line-height: 1.4; color: #333; }
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #6F4E37; padding-bottom: 10px; }
         .header h1 { color: #6F4E37; margin: 0; font-size: 24px; }
         .header p { margin: 2px 0; color: #666; }
@@ -80,10 +81,6 @@
             <tr>
                 <td>Tạm tính:</td>
                 <td style="text-align:right">{{ number_format($invoice->subtotal, 0, ',', '.') }}đ</td>
-            </tr>
-            <tr>
-                <td>VAT ({{ $invoice->tax_rate }}%):</td>
-                <td style="text-align:right">{{ number_format($invoice->tax_amount, 0, ',', '.') }}đ</td>
             </tr>
             @if($invoice->discount_amount > 0)
             <tr>

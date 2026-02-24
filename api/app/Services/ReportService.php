@@ -11,11 +11,11 @@ class ReportService
 {
     public function salesReport(string $from, string $to): array
     {
-        $orders = Order::where('status', 'completed')
+        $orders = Order::whereIn('status', ['completed', 'paid'])
             ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
             ->get();
 
-        $dailySales = Order::where('status', 'completed')
+        $dailySales = Order::whereIn('status', ['completed', 'paid'])
             ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
             ->select(DB::raw('DATE(created_at) as date'), DB::raw('SUM(total) as revenue'), DB::raw('COUNT(*) as orders_count'))
             ->groupBy('date')
@@ -34,7 +34,7 @@ class ReportService
     {
         return OrderItem::join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id')
-            ->where('orders.status', 'completed')
+            ->whereIn('orders.status', ['completed', 'paid'])
             ->whereBetween('orders.created_at', [$from, $to . ' 23:59:59'])
             ->select(
                 'menu_items.id',
@@ -54,7 +54,7 @@ class ReportService
         return OrderItem::join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id')
             ->join('categories', 'menu_items.category_id', '=', 'categories.id')
-            ->where('orders.status', 'completed')
+            ->whereIn('orders.status', ['completed', 'paid'])
             ->whereBetween('orders.created_at', [$from, $to . ' 23:59:59'])
             ->select(
                 'categories.id',
@@ -71,7 +71,7 @@ class ReportService
     public function tableUsage(string $from, string $to): array
     {
         return Order::join('layout_objects', 'orders.table_id', '=', 'layout_objects.id')
-            ->where('orders.status', 'completed')
+            ->whereIn('orders.status', ['completed', 'paid'])
             ->whereBetween('orders.created_at', [$from, $to . ' 23:59:59'])
             ->select(
                 'layout_objects.id',
@@ -89,7 +89,7 @@ class ReportService
     {
         $today = today();
         $orders = Order::whereDate('created_at', $today)->get();
-        $completed = $orders->where('status', 'completed');
+        $completed = $orders->whereIn('status', ['completed', 'paid']);
         $invoicesPaid = Invoice::whereDate('created_at', $today)->where('payment_status', 'paid')->sum('total');
 
         return [

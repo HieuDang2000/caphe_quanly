@@ -31,6 +31,8 @@ class Formatters {
         return 'Hoàn thành';
       case 'cancelled':
         return 'Đã hủy';
+      case 'paid':
+        return 'Đã thanh toán';
       default:
         return status;
     }

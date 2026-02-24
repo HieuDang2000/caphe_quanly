@@ -57,9 +57,8 @@ class Order extends Model
     public function recalculate(): void
     {
         $subtotal = $this->items()->sum('subtotal');
-        //TODO: tax
-        $tax = round($subtotal);
-        $total = $subtotal + $tax - $this->discount;
+        $tax = 0;
+        $total = $subtotal - $this->discount;
         $this->update(compact('subtotal', 'tax', 'total'));
     }
 }

@@ -8,6 +8,7 @@ use App\Services\InvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Mpdf\Mpdf;
 
 class InvoiceController extends Controller
 {
@@ -35,9 +36,46 @@ class InvoiceController extends Controller
     public function pdf(int $id)
     {
         $invoice = Invoice::findOrFail($id);
-        $pdf = $this->invoiceService->generatePdf($invoice);
+        $invoice->load(['order.items.menuItem', 'order.table', 'order.user', 'order.customer', 'payments']);
 
-        return $pdf->download("hoa-don-{$invoice->invoice_number}.pdf");
+        $html = view('invoices.pdf', ['invoice' => $invoice])->render();
+        $content = $this->renderPdfWithMpdf($html, [
+            'format' => 'A4',
+            'margin_left' => 10,
+            'margin_right' => 10,
+            'margin_top' => 10,
+            'margin_bottom' => 10,
+            'default_font' => 'dejavusans',
+        ]);
+
+        $filename = "hoa-don-{$invoice->invoice_number}.pdf";
+        return response($content, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+    }
+
+    public function receipt80mm(int $id)
+    {
+        $invoice = Invoice::findOrFail($id);
+        $invoice->load(['order.items.menuItem', 'order.table', 'order.user', 'order.customer']);
+
+        $html = view('invoices.receipt-80mm', ['invoice' => $invoice])->render();
+        // 80mm (receipt) - set page width 80mm, height large enough
+        $content = $this->renderPdfWithMpdf($html, [
+            'format' => [80, 300],
+            'margin_left' => 5,
+            'margin_right' => 5,
+            'margin_top' => 5,
+            'margin_bottom' => 5,
+            'default_font' => 'dejavusans',
+        ]);
+
+        $filename = "hoa-don-{$invoice->invoice_number}-80mm.pdf";
+        return response($content, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
     }
 
     public function addPayment(Request $request, int $id): JsonResponse
@@ -58,5 +96,12 @@ class InvoiceController extends Controller
             'payment' => $payment,
             'invoice' => $invoice,
         ]);
+    }
+
+    private function renderPdfWithMpdf(string $html, array $config): string
+    {
+        $mpdf = new Mpdf($config);
+        $mpdf->WriteHTML($html);
+        return $mpdf->Output('', 'S');
     }
 }

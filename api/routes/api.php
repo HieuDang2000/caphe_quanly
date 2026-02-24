@@ -82,6 +82,7 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/generate/{orderId}', [InvoiceController::class, 'generate']);
         Route::get('/{id}', [InvoiceController::class, 'show']);
         Route::get('/{id}/pdf', [InvoiceController::class, 'pdf']);
+        Route::get('/{id}/receipt', [InvoiceController::class, 'receipt80mm']);
         Route::post('/{id}/payment', [InvoiceController::class, 'addPayment']);
     });
 

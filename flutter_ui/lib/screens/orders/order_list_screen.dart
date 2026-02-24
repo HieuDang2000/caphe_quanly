@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/invoice_provider.dart';
+import '../../services/receipt_printer.dart';
 import '../../widgets/loading_widget.dart';
 
 /// Ngày hôm nay theo giờ Việt Nam (UTC+7), định dạng YYYY-MM-DD.
@@ -47,6 +49,8 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         return Colors.blue;
       case 'completed':
         return AppTheme.successColor;
+      case 'paid':
+        return AppTheme.primaryColor;
       case 'cancelled':
         return AppTheme.errorColor;
       default:
@@ -229,12 +233,60 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                         onPressed: () => ref.read(orderProvider.notifier).updateStatus(order['id'], 'in_progress', statusFilter: _statusFilter, date: _selectedDate),
                                         child: const Text('Về đang pha chế'),
                                       ),
-                                      if (order['invoice'] == null)
-                                        ElevatedButton.icon(
-                                          onPressed: () => context.push('/invoice/${order['id']}'),
-                                          icon: const Icon(Icons.receipt_long),
-                                          label: const Text('Tạo HĐ'),
-                                        ),
+                                      ElevatedButton.icon(
+                                        onPressed: () async {
+                                          final invoice = await ref.read(invoiceProvider.notifier).generateInvoice(order['id'] as int);
+                                          if (!mounted || invoice == null) return;
+                                          context.push('/payment/${invoice['id']}');
+                                        },
+                                        icon: const Icon(Icons.payment),
+                                        label: const Text('Thanh toán'),
+                                      ),
+                                    ],
+                                    if (status == 'paid' && order['invoice'] != null) ...[
+                                      ElevatedButton.icon(
+                                        onPressed: () async {
+                                          final invId = order['invoice']['id'] as int?;
+                                          if (invId == null) return;
+                                          final invoice = await ref.read(invoiceProvider.notifier).loadInvoice(invId);
+                                          if (!mounted || invoice == null) return;
+                                          final saved = await ReceiptPrinter.saveA4ToFile(invoice: invoice);
+                                          if (mounted && saved) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Đã lưu hoá đơn A4')),
+                                            );
+                                          }
+                                        },
+                                        icon: const Icon(Icons.picture_as_pdf),
+                                        label: const Text('Tải PDF A4'),
+                                      ),
+                                      // ElevatedButton.icon(
+                                      //   onPressed: () async {
+                                      //     final invId = order['invoice']['id'] as int?;
+                                      //     if (invId == null) return;
+                                      //     final invoice = await ref.read(invoiceProvider.notifier).loadInvoice(invId);
+                                      //     if (!mounted || invoice == null) return;
+                                      //     final saved = await ReceiptPrinter.save80mmToFile(invoice: invoice);
+                                      //     if (mounted && saved) {
+                                      //       ScaffoldMessenger.of(context).showSnackBar(
+                                      //         const SnackBar(content: Text('Đã lưu hoá đơn 80mm')),
+                                      //       );
+                                      //     }
+                                      //   },
+                                      //   icon: const Icon(Icons.receipt_long),
+                                      //   label: const Text('Tải 80mm'),
+                                      // ),
+                                      OutlinedButton.icon(
+                                        onPressed: () async {
+                                          final invId = order['invoice']['id'] as int?;
+                                          if (invId == null) return;
+                                          final invoice = await ref.read(invoiceProvider.notifier).loadInvoice(invId);
+                                          if (!mounted || invoice == null) return;
+                                          await ReceiptPrinter.print80mm(invoice: invoice);
+                                        },
+                                        icon: const Icon(Icons.print),
+                                        label: const Text('In hóa đơn'),
+                                      ),
                                     ],
                                   ],
                                 ),

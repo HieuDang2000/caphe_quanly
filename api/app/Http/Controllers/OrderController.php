@@ -16,7 +16,7 @@ class OrderController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Order::with(['items.menuItem', 'table', 'user', 'customer']);
+        $query = Order::with(['items.menuItem', 'table', 'user', 'customer', 'invoice']);
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -53,6 +53,9 @@ class OrderController extends Controller
         if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
 
         $order = $this->orderService->createOrder($request->all(), auth('api')->id());
+        //update order status
+        $order->update(['status' => 'in_progress']);
+
         return response()->json($order, 201);
     }
 
@@ -76,7 +79,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'status' => 'required|in:pending,in_progress,completed,cancelled',
+            'status' => 'required|in:pending,in_progress,completed,cancelled,paid',
         ]);
         if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
 
@@ -90,6 +93,7 @@ class OrderController extends Controller
             'in_progress' => 'Đang pha chế',
             'completed' => 'Hoàn thành',
             'cancelled' => 'Đã hủy',
+            'paid' => 'Đã thanh toán',
         ];
         $label = $statusLabels[$newStatus] ?? $newStatus;
         OrderActivity::log($order->id, auth('api')->id(), 'status_changed', "Đổi trạng thái sang {$label}", ['status' => $newStatus]);

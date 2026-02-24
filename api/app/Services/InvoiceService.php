@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Payment;
-use Barryvdh\DomPDF\Facade\Pdf;
 
 class InvoiceService
 {
@@ -16,10 +15,10 @@ class InvoiceService
         }
 
         $subtotal = $order->subtotal;
-        $taxRate = 8;
-        $taxAmount = round($subtotal * $taxRate / 100);
+        $taxRate = 0;
+        $taxAmount = 0;
         $discountAmount = $order->discount;
-        $total = $subtotal + $taxAmount - $discountAmount;
+        $total = $subtotal - $discountAmount;
 
         $invoice = Invoice::create([
             'order_id' => $order->id,
@@ -36,13 +35,6 @@ class InvoiceService
         return $invoice;
     }
 
-    public function generatePdf(Invoice $invoice): \Barryvdh\DomPDF\PDF
-    {
-        $invoice->load(['order.items.menuItem', 'order.table', 'order.user', 'order.customer', 'payments']);
-
-        return Pdf::loadView('invoices.pdf', ['invoice' => $invoice]);
-    }
-
     public function addPayment(Invoice $invoice, array $data): Payment
     {
         $payment = Payment::create([
@@ -56,6 +48,7 @@ class InvoiceService
         $totalPaid = $invoice->totalPaid();
         if ($totalPaid >= $invoice->total) {
             $invoice->update(['payment_status' => 'paid']);
+            $invoice->order?->update(['status' => 'paid']);
         } elseif ($totalPaid > 0) {
             $invoice->update(['payment_status' => 'partial']);
         }

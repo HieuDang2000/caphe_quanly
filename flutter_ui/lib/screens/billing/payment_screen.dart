@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/invoice_provider.dart';
+import '../../providers/order_provider.dart';
 import '../../widgets/loading_widget.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
@@ -57,8 +58,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       reference: _referenceController.text.isNotEmpty ? _referenceController.text : null,
     );
     if (success && mounted) {
+      // Reload danh sách đơn để cập nhật trạng thái đã thanh toán
+      await ref.read(orderProvider.notifier).loadOrders();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thanh toán thành công!')));
-      context.pop();
+      if (!mounted) return;
+      context.go('/orders/list');
     }
   }
 
