@@ -232,9 +232,8 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
             onPressed: () async {
               nav.pop();
-              final success = await ref.read(menuProvider.notifier).deleteCategory(category['id'] as int);
+              final success = await ref.read(menuProvider.notifier).deleteCategory(Formatters.toNum(category['id']).toInt());
               if (success && mounted) {
-                nav.pop();
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã xóa danh mục')));
               }
             },
@@ -248,16 +247,21 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
   void _confirmDelete(Map<String, dynamic> item) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Xóa món'),
         content: Text('Bạn có chắc muốn xóa "${item['name']}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Hủy')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
-            onPressed: () {
-              ref.read(menuProvider.notifier).deleteItem(item['id']);
-              Navigator.pop(context);
+            onPressed: () async {
+              final success = await ref.read(menuProvider.notifier).deleteItem(Formatters.toNum(item['id']).toInt());
+              if (mounted) {
+                Navigator.pop(dialogContext);
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã xóa món')));
+                }
+              }
             },
             child: const Text('Xóa'),
           ),

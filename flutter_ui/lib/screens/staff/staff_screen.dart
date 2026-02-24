@@ -12,6 +12,20 @@ final staffListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async
   return List<Map<String, dynamic>>.from(res.data);
 });
 
+final shiftsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final api = ref.watch(apiClientProvider);
+  final res = await api.get('${ApiConfig.staff}/shifts');
+  final data = res.data is Map ? (res.data as Map)['data'] : res.data;
+  return List<Map<String, dynamic>>.from(data ?? []);
+});
+
+final attendancesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final api = ref.watch(apiClientProvider);
+  final res = await api.get('${ApiConfig.staff}/attendances');
+  final data = res.data is Map ? (res.data as Map)['data'] : res.data;
+  return List<Map<String, dynamic>>.from(data ?? []);
+});
+
 class StaffScreen extends ConsumerStatefulWidget {
   const StaffScreen({super.key});
 
@@ -153,42 +167,42 @@ class _StaffListTab extends ConsumerWidget {
 class _ShiftsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return FutureBuilder(
-      future: ref.read(apiClientProvider).get('${ApiConfig.staff}/shifts'),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const LoadingWidget();
-        final shifts = List<Map<String, dynamic>>.from(snapshot.data!.data);
+    final shiftsAsync = ref.watch(shiftsProvider);
 
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: ElevatedButton.icon(
-                onPressed: () => _addShiftDialog(context, ref),
-                icon: const Icon(Icons.add),
-                label: const Text('Thêm ca'),
-              ),
+    return shiftsAsync.when(
+      loading: () => const LoadingWidget(),
+      error: (e, _) => Center(child: Text('Lỗi: $e')),
+      data: (shifts) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: ElevatedButton.icon(
+              onPressed: () => _addShiftDialog(context, ref),
+              icon: const Icon(Icons.add),
+              label: const Text('Thêm ca'),
             ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(8),
-                itemCount: shifts.length,
-                itemBuilder: (_, i) {
-                  final shift = shifts[i];
-                  return Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.schedule, color: AppTheme.primaryColor),
-                      title: Text(shift['user']?['name'] ?? ''),
-                      subtitle: Text('${shift['shift_date']} | ${shift['start_time']} - ${shift['end_time']}'),
-                      trailing: Chip(label: Text(shift['status'] ?? 'scheduled', style: const TextStyle(fontSize: 12))),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+          Expanded(
+            child: shifts.isEmpty
+                ? const Center(child: Text('Chưa có ca làm'))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: shifts.length,
+                    itemBuilder: (_, i) {
+                      final shift = shifts[i];
+                      return Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.schedule, color: AppTheme.primaryColor),
+                          title: Text(shift['user']?['name'] ?? ''),
+                          subtitle: Text('${shift['shift_date']} | ${shift['start_time']} - ${shift['end_time']}'),
+                          trailing: Chip(label: Text(shift['status'] ?? 'scheduled', style: const TextStyle(fontSize: 12))),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -200,7 +214,7 @@ class _ShiftsTab extends ConsumerWidget {
 
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Thêm ca làm'),
         content: SingleChildScrollView(
           child: Column(
@@ -217,17 +231,30 @@ class _ShiftsTab extends ConsumerWidget {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Hủy'),
+          ),
           ElevatedButton(
             onPressed: () async {
               final api = ref.read(apiClientProvider);
-              await api.post('${ApiConfig.staff}/shifts', data: {
-                'user_id': int.tryParse(userIdController.text),
-                'shift_date': dateController.text,
-                'start_time': startController.text,
-                'end_time': endController.text,
-              });
-              if (context.mounted) Navigator.pop(context);
+              try {
+                await api.post('${ApiConfig.staff}/shifts', data: {
+                  'user_id': int.tryParse(userIdController.text),
+                  'shift_date': dateController.text,
+                  'start_time': startController.text,
+                  'end_time': endController.text,
+                });
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                  ref.invalidate(shiftsProvider);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã tạo ca làm')));
+                }
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                }
+              }
             },
             child: const Text('Tạo'),
           ),
@@ -240,57 +267,75 @@ class _ShiftsTab extends ConsumerWidget {
 class _AttendanceTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return FutureBuilder(
-      future: ref.read(apiClientProvider).get('${ApiConfig.staff}/attendances'),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const LoadingWidget();
-        final attendances = List<Map<String, dynamic>>.from(snapshot.data!.data);
+    final attendancesAsync = ref.watch(attendancesProvider);
 
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () async {
+    return attendancesAsync.when(
+      loading: () => const LoadingWidget(),
+      error: (e, _) => Center(child: Text('Lỗi: $e')),
+      data: (attendances) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
                       await ref.read(apiClientProvider).post('${ApiConfig.staff}/check-in');
-                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Check-in thành công!')));
-                    },
-                    icon: const Icon(Icons.login),
-                    label: const Text('Check In'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () async {
+                      if (context.mounted) {
+                        ref.invalidate(attendancesProvider);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Check-in thành công!')));
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.login),
+                  label: const Text('Check In'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    try {
                       await ref.read(apiClientProvider).post('${ApiConfig.staff}/check-out');
-                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Check-out thành công!')));
+                      if (context.mounted) {
+                        ref.invalidate(attendancesProvider);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Check-out thành công!')));
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Check Out'),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: attendances.isEmpty
+                ? const Center(child: Text('Chưa có bản ghi chấm công'))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: attendances.length,
+                    itemBuilder: (_, i) {
+                      final att = attendances[i];
+                      return Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.fingerprint, color: AppTheme.primaryColor),
+                          title: Text(att['user']?['name'] ?? ''),
+                          subtitle: Text('In: ${att['check_in'] ?? '-'}\nOut: ${att['check_out'] ?? '-'}'),
+                        ),
+                      );
                     },
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Check Out'),
                   ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(8),
-                itemCount: attendances.length,
-                itemBuilder: (_, i) {
-                  final att = attendances[i];
-                  return Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.fingerprint, color: AppTheme.primaryColor),
-                      title: Text(att['user']?['name'] ?? ''),
-                      subtitle: Text('In: ${att['check_in'] ?? '-'}\nOut: ${att['check_out'] ?? '-'}'),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 }

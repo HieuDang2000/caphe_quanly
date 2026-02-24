@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/app_theme.dart';
+import '../../core/utils/formatters.dart';
 import '../../providers/layout_provider.dart';
 import '../../widgets/loading_widget.dart';
 
@@ -63,7 +64,7 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
     final controller = TextEditingController(text: suggested);
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text('Thêm ${_typeLabel[type] ?? type}'),
         content: TextField(
           controller: controller,
@@ -74,11 +75,11 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Hủy')),
           ElevatedButton(
             onPressed: () {
               final name = controller.text.trim().isEmpty ? suggested : controller.text.trim();
-              Navigator.pop(context);
+              Navigator.of(dialogContext).pop();
               _addObject(type, name);
             },
             child: const Text('Thêm'),
@@ -156,21 +157,22 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
             child: layoutState.isLoading
                 ? const LoadingWidget()
                 : InteractiveViewer(
-                    boundaryMargin: const EdgeInsets.all(500),
-                    minScale: 0.3,
+                    constrained: false,
+                    boundaryMargin: const EdgeInsets.all(200),
+                    minScale: 0.2,
                     maxScale: 3.0,
                     child: SizedBox(
                       width: 2000,
-                      height: 2000,
+                      height: 4000,
                       child: Stack(
                         children: layoutState.objects.map((obj) {
                           return Positioned(
-                            left: (obj['position_x'] as num).toDouble(),
-                            top: (obj['position_y'] as num).toDouble(),
+                            left: Formatters.toNum(obj['position_x']).toDouble(),
+                            top: Formatters.toNum(obj['position_y']).toDouble(),
                             child: GestureDetector(
                               onPanUpdate: (details) {
-                                final newX = (obj['position_x'] as num).toDouble() + details.delta.dx;
-                                final newY = (obj['position_y'] as num).toDouble() + details.delta.dy;
+                                final newX = Formatters.toNum(obj['position_x']).toDouble() + details.delta.dx;
+                                final newY = Formatters.toNum(obj['position_y']).toDouble() + details.delta.dy;
                                 ref.read(layoutProvider.notifier).updateLocalPosition(obj['id'], newX, newY);
                                 setState(() => _hasChanges = true);
                               },
@@ -190,10 +192,10 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
 
   Widget _buildObject(Map<String, dynamic> obj) {
     final type = obj['type'] as String;
-    final w = (obj['width'] as num).toDouble();
-    final h = (obj['height'] as num).toDouble();
+    final w = Formatters.toNum(obj['width']).toDouble();
+    final h = Formatters.toNum(obj['height']).toDouble();
     final name = obj['name'] as String? ?? '';
-    final rotationDeg = (obj['rotation'] as num?)?.toDouble() ?? 0.0;
+    final rotationDeg = Formatters.toNum(obj['rotation']).toDouble();
     final rotationRad = rotationDeg * math.pi / 180;
     final showNameAlways = ['wall', 'window', 'door', 'reception'].contains(type);
 
@@ -274,7 +276,7 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
   void _showObjectMenu(Map<String, dynamic> obj) {
     showModalBottomSheet(
       context: context,
-      builder: (_) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -287,7 +289,7 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
               leading: const Icon(Icons.rotate_right),
               title: const Text('Xoay 90°'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.of(sheetContext).pop();
                 final current = (obj['rotation'] as num?)?.toDouble() ?? 0.0;
                 final next = (current + 90) % 360;
                 ref.read(layoutProvider.notifier).updateLocalRotation(obj['id'], next);
@@ -298,7 +300,7 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
               leading: const Icon(Icons.edit),
               title: const Text('Đổi tên'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.of(sheetContext).pop();
                 _renameObject(obj);
               },
             ),
@@ -306,7 +308,7 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
               leading: const Icon(Icons.delete, color: AppTheme.errorColor),
               title: const Text('Xóa', style: TextStyle(color: AppTheme.errorColor)),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.of(sheetContext).pop();
                 ref.read(layoutProvider.notifier).deleteObject(obj['id']);
               },
             ),
@@ -320,15 +322,15 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
     final controller = TextEditingController(text: obj['name']);
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Đổi tên'),
         content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'Tên mới')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Hủy')),
           ElevatedButton(
             onPressed: () {
               ref.read(layoutProvider.notifier).updateObject(obj['id'], {'name': controller.text});
-              Navigator.pop(context);
+              Navigator.of(dialogContext).pop();
             },
             child: const Text('Lưu'),
           ),

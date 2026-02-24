@@ -26,7 +26,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       await ref.read(invoiceProvider.notifier).loadInvoice(widget.invoiceId);
       final invoice = ref.read(invoiceProvider).invoice;
       if (invoice != null) {
-        final remaining = (invoice['total'] as num) - _paidAmount(invoice);
+        final remaining = Formatters.toNum(invoice['total']) - _paidAmount(invoice);
         _amountController.text = remaining.toStringAsFixed(0);
       }
     });
@@ -34,7 +34,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   double _paidAmount(Map<String, dynamic> invoice) {
     final payments = List<Map<String, dynamic>>.from(invoice['payments'] ?? []);
-    return payments.fold(0.0, (sum, p) => sum + (p['amount'] as num));
+    return payments.fold(0.0, (sum, p) => sum + Formatters.toNum(p['amount']));
   }
 
   @override

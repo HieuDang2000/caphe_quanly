@@ -82,12 +82,12 @@ class _InvoiceScreenState extends ConsumerState<InvoiceScreen> {
                                   ),
                                 )),
                               const Divider(),
-                              _totalRow('Tạm tính', invoice['subtotal'] ?? 0),
-                              _totalRow('VAT (${invoice['tax_rate']}%)', invoice['tax_amount'] ?? 0),
-                              if ((invoice['discount_amount'] ?? 0) > 0)
-                                _totalRow('Giảm giá', -(invoice['discount_amount'] ?? 0)),
+                              _totalRow('Tạm tính', Formatters.toNum(invoice['subtotal'] ?? 0)),
+                              _totalRow('VAT (${invoice['tax_rate']}%)', Formatters.toNum(invoice['tax_amount'] ?? 0)),
+                              if (Formatters.toNum(invoice['discount_amount'] ?? 0) > 0)
+                                _totalRow('Giảm giá', -Formatters.toNum(invoice['discount_amount'] ?? 0)),
                               const Divider(),
-                              _totalRow('Tổng cộng', invoice['total'] ?? 0, isBold: true),
+                              _totalRow('Tổng cộng', Formatters.toNum(invoice['total'] ?? 0), isBold: true),
                             ],
                           ),
                         ),

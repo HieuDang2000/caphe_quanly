@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\OrderActivity;
 use App\Services\OrderService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -16,9 +18,19 @@ class OrderController extends Controller
     {
         $query = Order::with(['items.menuItem', 'table', 'user', 'customer']);
 
-        if ($request->has('status')) $query->where('status', $request->status);
-        if ($request->has('date')) $query->whereDate('created_at', $request->date);
-        if ($request->has('table_id')) $query->where('table_id', $request->table_id);
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+        // Lọc theo ngày, mặc định hôm nay theo giờ Việt Nam
+        $tz = 'Asia/Ho_Chi_Minh';
+        $dateStr = $request->get('date', Carbon::now($tz)->toDateString());
+        $start = Carbon::parse($dateStr . ' 00:00:00', $tz)->utc();
+        $end = Carbon::parse($dateStr . ' 23:59:59.999999', $tz)->utc();
+        $query->whereBetween('created_at', [$start, $end]);
+
+        if ($request->has('table_id')) {
+            $query->where('table_id', $request->table_id);
+        }
 
         $orders = $query->orderByDesc('created_at')->paginate($request->get('per_page', 20));
         return response()->json($orders);
@@ -33,6 +45,8 @@ class OrderController extends Controller
             'items.*.menu_item_id' => 'required|exists:menu_items,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.notes' => 'nullable|string',
+            'items.*.options' => 'nullable|array',
+            'items.*.options.*.id' => 'nullable|exists:menu_item_options,id',
             'notes' => 'nullable|string',
             'discount' => 'nullable|numeric|min:0',
         ]);
@@ -55,7 +69,7 @@ class OrderController extends Controller
             return response()->json(['message' => 'Không thể sửa đơn hàng đã hoàn thành/hủy'], 400);
         }
 
-        $order = $this->orderService->updateOrder($order, $request->all());
+        $order = $this->orderService->updateOrder($order, $request->all(), auth('api')->id());
         return response()->json($order);
     }
 
@@ -67,10 +81,41 @@ class OrderController extends Controller
         if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
 
         $order = Order::findOrFail($id);
-        $order->update(['status' => $request->status]);
+        $newStatus = $request->status;
+        $order->update(['status' => $newStatus]);
         $order->load(['items.menuItem', 'table', 'user']);
 
+        $statusLabels = [
+            'pending' => 'Chờ xử lý',
+            'in_progress' => 'Đang pha chế',
+            'completed' => 'Hoàn thành',
+            'cancelled' => 'Đã hủy',
+        ];
+        $label = $statusLabels[$newStatus] ?? $newStatus;
+        OrderActivity::log($order->id, auth('api')->id(), 'status_changed', "Đổi trạng thái sang {$label}", ['status' => $newStatus]);
+
         return response()->json($order);
+    }
+
+    public function activities(Request $request): JsonResponse
+    {
+        $tz = 'Asia/Ho_Chi_Minh';
+        $dateStr = $request->get('date', Carbon::now($tz)->toDateString());
+        $start = Carbon::parse($dateStr . ' 00:00:00', $tz)->utc();
+        $end = Carbon::parse($dateStr . ' 23:59:59.999999', $tz)->utc();
+
+        $query = OrderActivity::with(['order:id,order_number,status', 'user:id,name'])
+            ->whereBetween('created_at', [$start, $end]);
+
+        if ($request->filled('order_id')) {
+            $query->where('order_id', $request->order_id);
+        }
+        if ($request->filled('action')) {
+            $query->where('action', $request->action);
+        }
+
+        $activities = $query->orderByDesc('created_at')->paginate($request->get('per_page', 20));
+        return response()->json($activities);
     }
 
     public function tableOrders(int $tableId): JsonResponse

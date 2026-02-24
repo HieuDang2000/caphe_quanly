@@ -8,6 +8,7 @@ use App\Models\Floor;
 use App\Models\InventoryItem;
 use App\Models\LayoutObject;
 use App\Models\MenuItem;
+use App\Models\MenuItemOption;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -105,6 +106,18 @@ class DatabaseSeeder extends Seeder
         ];
         foreach ($foodItems as $idx => $item) {
             MenuItem::create(array_merge($item, ['category_id' => $food->id, 'sort_order' => $idx + 1]));
+        }
+
+        // Menu item options (Size L, Trân châu, etc.)
+        $traDao = MenuItem::where('name', 'Trà đào')->first();
+        if ($traDao) {
+            MenuItemOption::create(['menu_item_id' => $traDao->id, 'name' => 'Size L', 'extra_price' => 5000]);
+            MenuItemOption::create(['menu_item_id' => $traDao->id, 'name' => 'Trân châu thêm', 'extra_price' => 4000]);
+        }
+        $caPheSua = MenuItem::where('name', 'Cà phê sữa')->first();
+        if ($caPheSua) {
+            MenuItemOption::create(['menu_item_id' => $caPheSua->id, 'name' => 'Size L', 'extra_price' => 5000]);
+            MenuItemOption::create(['menu_item_id' => $caPheSua->id, 'name' => 'Trân châu thêm', 'extra_price' => 4000]);
         }
 
         // Sample customers

@@ -5,6 +5,7 @@ class Formatters {
   static final _dateFormat = DateFormat('dd/MM/yyyy');
   static final _dateTimeFormat = DateFormat('dd/MM/yyyy HH:mm');
   static final _timeFormat = DateFormat('HH:mm');
+  static final _shortDateTimeFormat = DateFormat('dd/MM HH:mm');
 
   /// Chuyển giá từ API (có thể là int, double hoặc String) sang num để tránh lỗi type.
   static num toNum(dynamic value) {
@@ -18,6 +19,7 @@ class Formatters {
   static String date(DateTime dt) => _dateFormat.format(dt);
   static String dateTime(DateTime dt) => _dateTimeFormat.format(dt);
   static String time(DateTime dt) => _timeFormat.format(dt);
+  static String shortDateTime(DateTime dt) => _shortDateTimeFormat.format(dt);
 
   static String orderStatus(String status) {
     switch (status) {

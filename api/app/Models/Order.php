@@ -49,10 +49,16 @@ class Order extends Model
         return $this->hasOne(Invoice::class);
     }
 
+    public function activities(): HasMany
+    {
+        return $this->hasMany(OrderActivity::class);
+    }
+
     public function recalculate(): void
     {
         $subtotal = $this->items()->sum('subtotal');
-        $tax = round($subtotal * 0.08);
+        //TODO: tax
+        $tax = round($subtotal);
         $total = $subtotal + $tax - $this->discount;
         $this->update(compact('subtotal', 'tax', 'total'));
     }

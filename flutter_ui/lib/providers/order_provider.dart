@@ -44,7 +44,36 @@ class OrderState {
     );
   }
 
-  double get cartTotal => cartItems.fold(0, (sum, item) => sum + Formatters.toNum(item['price']) * (item['quantity'] as num));
+  static bool _optionsMatch(List<dynamic>? a, List<dynamic>? b) {
+    final aa = (a ?? []).map((e) => Formatters.toNum(e is Map ? e['id'] : e).toInt()).where((id) => id > 0).toList()..sort();
+    final bb = (b ?? []).map((e) => Formatters.toNum(e is Map ? e['id'] : e).toInt()).where((id) => id > 0).toList()..sort();
+    if (aa.length != bb.length) return false;
+    for (var i = 0; i < aa.length; i++) if (aa[i] != bb[i]) return false;
+    return true;
+  }
+
+  static bool _notesMatch(String? a, String? b) {
+    return (a ?? '').trim() == (b ?? '').trim();
+  }
+
+  static int _findCartIndex(List<Map<String, dynamic>> cart, int menuItemId, List<Map<String, dynamic>>? options, String? notes) {
+    final optList = options ?? [];
+    final noteNorm = (notes ?? '').trim();
+    for (var i = 0; i < cart.length; i++) {
+      if (cart[i]['menu_item_id'] != menuItemId) continue;
+      if (!_optionsMatch(cart[i]['options'] as List?, optList)) continue;
+      if (!_notesMatch(cart[i]['notes'] as String?, noteNorm.isEmpty ? null : noteNorm)) continue;
+      return i;
+    }
+    return -1;
+  }
+
+  double get cartTotal => cartItems.fold(0, (sum, item) {
+    final base = Formatters.toNum(item['price']);
+    final opts = item['options'] as List? ?? [];
+    final extra = opts.fold<double>(0, (s, o) => s + Formatters.toNum(o is Map ? o['extra_price'] : 0));
+    return sum + (base + extra) * Formatters.toNum(item['quantity']);
+  });
 }
 
 class OrderNotifier extends StateNotifier<OrderState> {
@@ -60,11 +89,13 @@ class OrderNotifier extends StateNotifier<OrderState> {
     );
   }
 
-  void addToCart(Map<String, dynamic> menuItem, {String? notes}) {
-    final existing = state.cartItems.indexWhere((i) => i['menu_item_id'] == menuItem['id']);
+  void addToCart(Map<String, dynamic> menuItem, {String? notes, int quantity = 1, List<Map<String, dynamic>>? options}) {
+    final opts = options ?? [];
+    final existing = OrderState._findCartIndex(state.cartItems, menuItem['id'], opts, notes);
     if (existing >= 0) {
       final updated = List<Map<String, dynamic>>.from(state.cartItems);
-      updated[existing] = {...updated[existing], 'quantity': (updated[existing]['quantity'] as int) + 1};
+      final newQty = Formatters.toNum(updated[existing]['quantity']).toInt() + quantity;
+      updated[existing] = {...updated[existing], 'quantity': newQty, if (notes != null) 'notes': notes};
       state = state.copyWith(cartItems: updated);
     } else {
       state = state.copyWith(cartItems: [
@@ -73,28 +104,47 @@ class OrderNotifier extends StateNotifier<OrderState> {
           'menu_item_id': menuItem['id'],
           'name': menuItem['name'],
           'price': Formatters.toNum(menuItem['price']),
-          'quantity': 1,
+          'quantity': quantity,
           'notes': notes,
+          'options': opts,
         },
       ]);
     }
   }
 
-  void removeFromCart(int menuItemId) {
-    state = state.copyWith(cartItems: state.cartItems.where((i) => i['menu_item_id'] != menuItemId).toList());
+  void removeFromCart(int menuItemId, {List<Map<String, dynamic>>? options, String? notes}) {
+    final idx = OrderState._findCartIndex(state.cartItems, menuItemId, options, notes);
+    if (idx < 0) return;
+    final updated = List<Map<String, dynamic>>.from(state.cartItems)..removeAt(idx);
+    state = state.copyWith(cartItems: updated);
   }
 
-  void updateCartQuantity(int menuItemId, int quantity) {
+  void updateCartQuantity(int menuItemId, int quantity, {List<Map<String, dynamic>>? options, String? notes}) {
     if (quantity <= 0) {
-      removeFromCart(menuItemId);
+      removeFromCart(menuItemId, options: options, notes: notes);
       return;
     }
-    state = state.copyWith(
-      cartItems: state.cartItems.map((i) {
-        if (i['menu_item_id'] == menuItemId) return {...i, 'quantity': quantity};
-        return i;
-      }).toList(),
-    );
+    final idx = OrderState._findCartIndex(state.cartItems, menuItemId, options, notes);
+    if (idx < 0) return;
+    final updated = List<Map<String, dynamic>>.from(state.cartItems);
+    updated[idx] = {...updated[idx], 'quantity': quantity};
+    state = state.copyWith(cartItems: updated);
+  }
+
+  void updateCartItemNote(int menuItemId, String? note, {List<Map<String, dynamic>>? options, String? notes}) {
+    final idx = OrderState._findCartIndex(state.cartItems, menuItemId, options, notes);
+    if (idx < 0) return;
+    final updated = List<Map<String, dynamic>>.from(state.cartItems);
+    updated[idx] = {...updated[idx], 'notes': note};
+    state = state.copyWith(cartItems: updated);
+  }
+
+  void updateCartItemOptions(int menuItemId, List<Map<String, dynamic>>? options, {List<Map<String, dynamic>>? currentOptions, String? currentNotes}) {
+    final idx = OrderState._findCartIndex(state.cartItems, menuItemId, currentOptions, currentNotes);
+    if (idx < 0) return;
+    final updated = List<Map<String, dynamic>>.from(state.cartItems);
+    updated[idx] = {...updated[idx], 'options': options ?? []};
+    state = state.copyWith(cartItems: updated);
   }
 
   void clearCart() {
@@ -109,10 +159,18 @@ class OrderNotifier extends StateNotifier<OrderState> {
         'table_id': state.selectedTableId,
         'customer_id': customerId,
         'notes': notes,
-        'items': state.cartItems.map((i) => {
-          'menu_item_id': i['menu_item_id'],
-          'quantity': i['quantity'],
-          'notes': i['notes'],
+        'items': state.cartItems.map((i) {
+          final opts = i['options'] as List?;
+          return {
+            'menu_item_id': i['menu_item_id'],
+            'quantity': i['quantity'],
+            'notes': i['notes'],
+            'options': opts?.map((o) => {
+              'id': (o as Map)['id'],
+              'name': o['name'],
+              'extra_price': o['extra_price'],
+            }).toList() ?? [],
+          };
         }).toList(),
       };
       final res = await _api.post(ApiConfig.orders, data: data);
@@ -147,10 +205,11 @@ class OrderNotifier extends StateNotifier<OrderState> {
     } catch (_) {}
   }
 
-  Future<void> updateStatus(int orderId, String status) async {
+  Future<void> updateStatus(int orderId, String status, {String? statusFilter, String? date}) async {
     try {
       await _api.put('${ApiConfig.orders}/$orderId/status', data: {'status': status});
       await loadActiveOrders();
+      await loadOrders(status: statusFilter, date: date);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }

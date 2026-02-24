@@ -7,6 +7,7 @@ import '../screens/menu/menu_list_screen.dart';
 import '../screens/menu/menu_form_screen.dart';
 import '../screens/orders/order_screen.dart';
 import '../screens/orders/order_list_screen.dart';
+import '../screens/orders/order_history_screen.dart';
 import '../screens/billing/invoice_screen.dart';
 import '../screens/billing/payment_screen.dart';
 import '../screens/reports/dashboard_screen.dart';
@@ -43,6 +44,7 @@ GoRouter createRouter(bool isLoggedIn) {
           ),
           GoRoute(path: '/orders', builder: (_, _) => const OrderScreen()),
           GoRoute(path: '/orders/list', builder: (_, _) => const OrderListScreen()),
+          GoRoute(path: '/orders/history', builder: (_, _) => const OrderHistoryScreen()),
           GoRoute(
             path: '/invoice/:orderId',
             builder: (_, state) => InvoiceScreen(orderId: int.parse(state.pathParameters['orderId']!)),

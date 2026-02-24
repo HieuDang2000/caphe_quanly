@@ -62,6 +62,7 @@ class _Sidebar extends ConsumerWidget {
               _SidebarItem(icon: Icons.restaurant_menu, label: 'Menu', route: '/menu'),
               _SidebarItem(icon: Icons.receipt_long, label: 'Đặt món', route: '/orders'),
               _SidebarItem(icon: Icons.list_alt, label: 'Đơn hàng', route: '/orders/list'),
+              _SidebarItem(icon: Icons.history, label: 'Lịch sử', route: '/orders/history'),
               if (role == 'admin' || role == 'manager' || role == 'cashier')
                 _SidebarItem(icon: Icons.analytics, label: 'Báo cáo', route: '/reports'),
               if (role == 'admin')

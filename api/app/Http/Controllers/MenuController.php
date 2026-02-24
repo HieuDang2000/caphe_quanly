@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\MenuItem;
+use App\Models\MenuItemOption;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -49,7 +50,7 @@ class MenuController extends Controller
 
     public function items(Request $request): JsonResponse
     {
-        $query = MenuItem::with('category');
+        $query = MenuItem::with(['category', 'options']);
         if ($request->has('category_id')) {
             $query->where('category_id', $request->category_id);
         }
@@ -68,19 +69,33 @@ class MenuController extends Controller
             'price' => 'required|numeric|min:0',
             'description' => 'nullable|string',
             'sort_order' => 'integer',
+            'options' => 'nullable|array',
+            'options.*.name' => 'required_with:options|string|max:255',
+            'options.*.extra_price' => 'required_with:options|numeric|min:0',
         ]);
         if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
 
         $item = MenuItem::create($request->only(['category_id', 'name', 'price', 'description', 'sort_order']));
-        $item->load('category');
+        $this->syncMenuItemOptions($item, $request->input('options', []));
+        $item->load(['category', 'options']);
         return response()->json($item, 201);
     }
 
     public function updateItem(Request $request, int $id): JsonResponse
     {
+        $validator = Validator::make($request->all(), [
+            'options' => 'nullable|array',
+            'options.*.name' => 'required_with:options|string|max:255',
+            'options.*.extra_price' => 'required_with:options|numeric|min:0',
+        ]);
+        if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
+
         $item = MenuItem::findOrFail($id);
         $item->update($request->only(['category_id', 'name', 'price', 'description', 'is_available', 'sort_order']));
-        $item->load('category');
+        if ($request->has('options')) {
+            $this->syncMenuItemOptions($item, $request->input('options', []));
+        }
+        $item->load(['category', 'options']);
         return response()->json($item);
     }
 
@@ -107,5 +122,17 @@ class MenuController extends Controller
         $item->update(['image' => $path]);
 
         return response()->json(['image' => $path, 'url' => Storage::disk('public')->url($path)]);
+    }
+
+    protected function syncMenuItemOptions(MenuItem $item, array $optionsRaw): void
+    {
+        $item->options()->delete();
+        foreach ($optionsRaw as $opt) {
+            MenuItemOption::create([
+                'menu_item_id' => $item->id,
+                'name' => $opt['name'],
+                'extra_price' => $opt['extra_price'] ?? 0,
+            ]);
+        }
     }
 }

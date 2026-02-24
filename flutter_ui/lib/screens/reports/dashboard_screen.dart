@@ -98,7 +98,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   barGroups: dailySales.asMap().entries.map((entry) {
                     return BarChartGroupData(x: entry.key, barRods: [
                       BarChartRodData(
-                        toY: (entry.value['revenue'] as num).toDouble() / 1000,
+                        toY: Formatters.toNum(entry.value['revenue']).toDouble() / 1000,
                         color: AppTheme.primaryColor,
                         width: 16,
                         borderRadius: const BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(4)),
@@ -135,7 +135,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget _buildCategoryPieChart(List<Map<String, dynamic>> categories) {
     if (categories.isEmpty) return const SizedBox.shrink();
     final colors = [AppTheme.primaryColor, AppTheme.secondaryColor, AppTheme.accentColor, Colors.teal, Colors.indigo, Colors.pink];
-    final totalRevenue = categories.fold<num>(0, (sum, c) => sum + (c['revenue'] as num));
+    final totalRevenue = categories.fold<num>(0, (sum, c) => sum + Formatters.toNum(c['revenue']));
 
     return Card(
       child: Padding(
@@ -153,9 +153,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     child: PieChart(
                       PieChartData(
                         sections: categories.asMap().entries.map((entry) {
-                          final pct = totalRevenue > 0 ? (entry.value['revenue'] as num) / totalRevenue * 100 : 0;
+                          final pct = totalRevenue > 0 ? Formatters.toNum(entry.value['revenue']) / totalRevenue * 100 : 0;
                           return PieChartSectionData(
-                            value: (entry.value['revenue'] as num).toDouble(),
+                            value: Formatters.toNum(entry.value['revenue']).toDouble(),
                             color: colors[entry.key % colors.length],
                             title: '${pct.toStringAsFixed(0)}%',
                             titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),

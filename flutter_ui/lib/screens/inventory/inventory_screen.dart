@@ -42,8 +42,8 @@ class InventoryScreen extends ConsumerWidget {
           itemCount: items.length,
           itemBuilder: (_, index) {
             final item = items[index];
-            final qty = (item['quantity'] as num).toDouble();
-            final minQty = (item['min_quantity'] as num).toDouble();
+            final qty = Formatters.toNum(item['quantity']).toDouble();
+            final minQty = Formatters.toNum(item['min_quantity']).toDouble();
             final isLow = qty <= minQty;
 
             return Card(
@@ -141,7 +141,7 @@ class InventoryScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Tồn kho: ${(item['quantity'] as num).toStringAsFixed(1)} ${item['unit']}'),
+                Text('Tồn kho: ${Formatters.toNum(item['quantity']).toStringAsFixed(1)} ${item['unit']}'),
                 const SizedBox(height: 16),
                 SegmentedButton<String>(
                   segments: const [
@@ -203,7 +203,7 @@ class InventoryScreen extends ConsumerWidget {
                     dense: true,
                     leading: const Icon(Icons.warning, color: AppTheme.errorColor),
                     title: Text(item['name'] ?? ''),
-                    subtitle: Text('Còn: ${(item['quantity'] as num).toStringAsFixed(1)} ${item['unit']} (tối thiểu: ${(item['min_quantity'] as num).toStringAsFixed(1)})'),
+                    subtitle: Text('Còn: ${Formatters.toNum(item['quantity']).toStringAsFixed(1)} ${item['unit']} (tối thiểu: ${Formatters.toNum(item['min_quantity']).toStringAsFixed(1)})'),
                   )).toList(),
                 ),
               ),

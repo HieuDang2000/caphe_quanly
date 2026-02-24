@@ -12,14 +12,21 @@ class HomeScreen extends ConsumerWidget {
     final user = authState.user;
     final role = user?['role']?['name'] ?? 'staff';
 
+    final maxContentWidth = 800.0;
+    const maxTileExtent = 220.0;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Coffee Shop Manager')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Card(
               color: AppTheme.primaryColor,
               child: Padding(
                 padding: const EdgeInsets.all(20),
@@ -57,13 +64,17 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 24),
             Text('Chức năng', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.3,
-                children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = (constraints.maxWidth / maxTileExtent).floor().clamp(2, 4);
+                return GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.3,
+                  children: [
                   _MenuCard(icon: Icons.receipt_long, label: 'Đặt món', color: AppTheme.primaryColor, onTap: () => context.go('/orders')),
                   _MenuCard(icon: Icons.list_alt, label: 'Đơn hàng', color: AppTheme.secondaryColor, onTap: () => context.go('/orders/list')),
                   _MenuCard(icon: Icons.restaurant_menu, label: 'Menu', color: AppTheme.accentColor, onTap: () => context.go('/menu')),
@@ -79,10 +90,13 @@ class HomeScreen extends ConsumerWidget {
                     _MenuCard(icon: Icons.loyalty, label: 'Khách hàng', color: Colors.pink, onTap: () => context.go('/customers')),
                     _MenuCard(icon: Icons.event_seat, label: 'Đặt bàn', color: Colors.green, onTap: () => context.go('/reservations')),
                   ],
-                ],
-              ),
+                  ],
+                );
+              },
             ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
