@@ -49,11 +49,6 @@ class Order extends Model
         return $this->hasOne(Invoice::class);
     }
 
-    public function activities(): HasMany
-    {
-        return $this->hasMany(OrderActivity::class);
-    }
-
     public function recalculate(): void
     {
         $subtotal = $this->items()->sum('subtotal');

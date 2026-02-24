@@ -56,20 +56,33 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
                     label: const Text('Tất cả'),
                     selected: menuState.selectedCategoryId == null,
                     selectedColor: AppTheme.primaryColor,
-                    labelStyle: TextStyle(color: menuState.selectedCategoryId == null ? Colors.white : null),
-                    onSelected: (_) => ref.read(menuProvider.notifier).loadItems(),
+                    labelStyle: TextStyle(
+                      color: menuState.selectedCategoryId == null
+                          ? Colors.white
+                          : null,
+                    ),
+                    onSelected: (_) =>
+                        ref.read(menuProvider.notifier).loadItems(),
                   ),
                 ),
-                ...menuState.categories.map((cat) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(cat['name']),
-                    selected: menuState.selectedCategoryId == cat['id'],
-                    selectedColor: AppTheme.primaryColor,
-                    labelStyle: TextStyle(color: menuState.selectedCategoryId == cat['id'] ? Colors.white : null),
-                    onSelected: (_) => ref.read(menuProvider.notifier).loadItems(categoryId: cat['id']),
+                ...menuState.categories.map(
+                  (cat) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(cat['name']),
+                      selected: menuState.selectedCategoryId == cat['id'],
+                      selectedColor: AppTheme.primaryColor,
+                      labelStyle: TextStyle(
+                        color: menuState.selectedCategoryId == cat['id']
+                            ? Colors.white
+                            : null,
+                      ),
+                      onSelected: (_) => ref
+                          .read(menuProvider.notifier)
+                          .loadItems(categoryId: cat['id']),
+                    ),
                   ),
-                )),
+                ),
               ],
             ),
           ),
@@ -77,35 +90,133 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
             child: menuState.isLoading
                 ? const LoadingWidget()
                 : menuState.items.isEmpty
-                    ? const Center(child: Text('Chưa có món nào'))
-                    : ListView.builder(
+                ? const Center(child: Text('Chưa có món nào'))
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Mỗi ô ~ 180-220px là vừa cho web/desktop.
+                      final targetTileWidth = 200.0;
+                      final targetTileHeight = 150.0; // thấp hơn 50px
+                      final crossAxisCount =
+                          (constraints.maxWidth / targetTileWidth)
+                              .floor()
+                              .clamp(2, 6);
+
+                      return GridView.builder(
                         padding: const EdgeInsets.all(8),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                          childAspectRatio: targetTileWidth / targetTileHeight,
+                        ),
                         itemCount: menuState.items.length,
                         itemBuilder: (_, index) {
                           final item = menuState.items[index];
-                          return Card(
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-                                child: const Icon(Icons.restaurant, color: AppTheme.primaryColor),
+                          final name = item['name']?.toString() ?? '';
+                          final categoryName =
+                              item['category']?['name']?.toString() ?? '';
+                          final isAvailable = item['is_available'] != false;
+
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () =>
+                                context.push('/menu/form', extra: item),
+                            onLongPress: () => _confirmDelete(item),
+                            child: Card(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.w600)),
-                              subtitle: Text(item['category']?['name'] ?? ''),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(Formatters.currency(item['price'] ?? 0), style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
-                                  if (item['is_available'] == false)
-                                    const Text('Hết hàng', style: TextStyle(color: AppTheme.errorColor, fontSize: 12)),
-                                ],
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 18,
+                                          backgroundColor: AppTheme.primaryColor
+                                              .withValues(alpha: 0.1),
+                                          child: const Icon(
+                                            Icons.restaurant,
+                                            color: AppTheme.primaryColor,
+                                            size: 18,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        if (!isAvailable)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.errorColor
+                                                  .withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: const Text(
+                                              'Hết hàng',
+                                              style: TextStyle(
+                                                color: AppTheme.errorColor,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      categoryName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.payments_outlined,
+                                          size: 16,
+                                          color: AppTheme.primaryColor,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          Formatters.currency(
+                                            item['price'] ?? 0,
+                                          ),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.primaryColor,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                              onTap: () => context.push('/menu/form', extra: item),
-                              onLongPress: () => _confirmDelete(item),
                             ),
                           );
                         },
-                      ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -129,7 +240,10 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Quản lý danh mục', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Quản lý danh mục',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                   TextButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
@@ -164,7 +278,10 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete, color: AppTheme.errorColor),
+                          icon: const Icon(
+                            Icons.delete,
+                            color: AppTheme.errorColor,
+                          ),
                           onPressed: () {
                             _confirmDeleteCategory(cat);
                           },
@@ -183,7 +300,9 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
 
   void _showCategoryDialog({Map<String, dynamic>? category}) {
     final nameController = TextEditingController(text: category?['name'] ?? '');
-    final descController = TextEditingController(text: category?['description'] ?? '');
+    final descController = TextEditingController(
+      text: category?['description'] ?? '',
+    );
 
     showDialog(
       context: context,
@@ -192,19 +311,30 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Tên danh mục')),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Tên danh mục'),
+            ),
             const SizedBox(height: 12),
-            TextField(controller: descController, decoration: const InputDecoration(labelText: 'Mô tả')),
+            TextField(
+              controller: descController,
+              decoration: const InputDecoration(labelText: 'Mô tả'),
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
           ElevatedButton(
             onPressed: () async {
-              final success = await ref.read(menuProvider.notifier).saveCategory(
-                {'name': nameController.text, 'description': descController.text},
-                id: category?['id'],
-              );
+              final success = await ref
+                  .read(menuProvider.notifier)
+                  .saveCategory({
+                    'name': nameController.text,
+                    'description': descController.text,
+                  }, id: category?['id']);
               if (success && mounted) Navigator.pop(context);
             },
             child: const Text('Lưu'),
@@ -229,12 +359,18 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
         actions: [
           TextButton(onPressed: () => nav.pop(), child: const Text('Hủy')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorColor,
+            ),
             onPressed: () async {
               nav.pop();
-              final success = await ref.read(menuProvider.notifier).deleteCategory(Formatters.toNum(category['id']).toInt());
+              final success = await ref
+                  .read(menuProvider.notifier)
+                  .deleteCategory(Formatters.toNum(category['id']).toInt());
               if (success && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã xóa danh mục')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đã xóa danh mục')),
+                );
               }
             },
             child: const Text('Xóa'),
@@ -251,15 +387,24 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
         title: const Text('Xóa món'),
         content: Text('Bạn có chắc muốn xóa "${item['name']}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Hủy')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Hủy'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorColor,
+            ),
             onPressed: () async {
-              final success = await ref.read(menuProvider.notifier).deleteItem(Formatters.toNum(item['id']).toInt());
+              final success = await ref
+                  .read(menuProvider.notifier)
+                  .deleteItem(Formatters.toNum(item['id']).toInt());
               if (mounted) {
                 Navigator.pop(dialogContext);
                 if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã xóa món')));
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Đã xóa món')));
                 }
               }
             },

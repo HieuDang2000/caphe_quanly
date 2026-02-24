@@ -33,7 +33,6 @@ class AppDrawer extends ConsumerWidget {
             _DrawerItem(icon: Icons.grid_view, label: 'Sơ đồ quán', route: '/layout'),
           _DrawerItem(icon: Icons.restaurant_menu, label: 'Menu', route: '/menu'),
           _DrawerItem(icon: Icons.list_alt, label: 'Đơn hàng', route: '/orders/list'),
-          _DrawerItem(icon: Icons.history, label: 'Lịch sử', route: '/orders/history'),
           if (role == 'admin' || role == 'manager' || role == 'cashier')
             _DrawerItem(icon: Icons.analytics, label: 'Báo cáo', route: '/reports'),
           if (role == 'admin')

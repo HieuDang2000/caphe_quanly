@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Order;
-use App\Models\OrderActivity;
 use App\Models\OrderItem;
 use App\Models\MenuItem;
 use App\Models\MenuItemOption;
@@ -38,8 +37,6 @@ class OrderService
         $order->recalculate();
         $order->load(['items.menuItem', 'table', 'user', 'customer']);
 
-        OrderActivity::log($order->id, $userId, 'created', "Tạo đơn #{$order->order_number}");
-
         return $order;
     }
 
@@ -72,8 +69,6 @@ class OrderService
         $order->recalculate();
         $order->load(['items.menuItem', 'table', 'user', 'customer']);
 
-        OrderActivity::log($order->id, $userId, 'items_added', "Thêm món vào đơn #{$order->order_number}");
-
         return $order;
     }
 
@@ -88,8 +83,6 @@ class OrderService
 
         $order->recalculate();
         $order->load(['items.menuItem', 'table', 'user', 'customer']);
-
-        OrderActivity::log($order->id, $userId, 'updated', "Cập nhật đơn #{$order->order_number}");
 
         return $order;
     }

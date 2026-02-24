@@ -133,7 +133,6 @@ class _Sidebar extends ConsumerWidget {
                 _SidebarItem(icon: Icons.grid_view, label: 'Sơ đồ quán', route: '/layout', showLabel: showLabels),
               _SidebarItem(icon: Icons.restaurant_menu, label: 'Menu', route: '/menu', showLabel: showLabels),
               _SidebarItem(icon: Icons.list_alt, label: 'Đơn hàng', route: '/orders/list', showLabel: showLabels),
-              _SidebarItem(icon: Icons.history, label: 'Lịch sử', route: '/orders/history', showLabel: showLabels),
               if (role == 'admin' || role == 'manager' || role == 'cashier')
                 _SidebarItem(icon: Icons.analytics, label: 'Báo cáo', route: '/reports', showLabel: showLabels),
               if (role == 'admin')
