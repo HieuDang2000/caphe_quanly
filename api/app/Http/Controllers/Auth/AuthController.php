@@ -14,16 +14,26 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
-            'password' => 'required|string|min:6',
+            'username' => 'required|string',
+            'password' => 'required|string|min:5',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $credentials = $request->only('email', 'password');
-        $token = auth('api')->attempt($credentials);
+        $username = $request->input('username');
+        $password = $request->input('password');
+
+        $user = User::where('email', $username)
+            ->orWhere('name', $username)
+            ->first();
+
+        if (!$user || !Hash::check($password, $user->password)) {
+            return response()->json(['message' => 'Tên đăng nhập hoặc mật khẩu không đúng'], 401);
+        }
+
+        $token = auth('api')->login($user);
 
         if (!$token) {
             return response()->json(['message' => 'Email hoặc mật khẩu không đúng'], 401);

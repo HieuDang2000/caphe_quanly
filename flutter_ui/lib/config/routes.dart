@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../screens/auth/login_screen.dart';
-import '../screens/home/home_screen.dart';
 import '../screens/layout/layout_editor_screen.dart';
 import '../screens/menu/menu_list_screen.dart';
 import '../screens/menu/menu_form_screen.dart';
@@ -35,7 +34,7 @@ GoRouter createRouter(bool isLoggedIn) {
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
-          GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
+          GoRoute(path: '/', builder: (_, _) => const OrderScreen()),
           GoRoute(path: '/layout', builder: (_, _) => const LayoutEditorScreen()),
           GoRoute(path: '/menu', builder: (_, _) => const MenuListScreen()),
           GoRoute(

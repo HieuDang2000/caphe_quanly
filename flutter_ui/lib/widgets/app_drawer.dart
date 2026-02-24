@@ -29,11 +29,9 @@ class AppDrawer extends ConsumerWidget {
             accountName: Text(user?['name'] ?? 'User'),
             accountEmail: Text(user?['email'] ?? ''),
           ),
-          _DrawerItem(icon: Icons.home, label: 'Trang chủ', route: '/'),
           if (role == 'admin' || role == 'manager')
             _DrawerItem(icon: Icons.grid_view, label: 'Sơ đồ quán', route: '/layout'),
           _DrawerItem(icon: Icons.restaurant_menu, label: 'Menu', route: '/menu'),
-          _DrawerItem(icon: Icons.receipt_long, label: 'Đặt món', route: '/orders'),
           _DrawerItem(icon: Icons.list_alt, label: 'Đơn hàng', route: '/orders/list'),
           _DrawerItem(icon: Icons.history, label: 'Lịch sử', route: '/orders/history'),
           if (role == 'admin' || role == 'manager' || role == 'cashier')

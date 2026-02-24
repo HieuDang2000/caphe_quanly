@@ -1,5 +1,6 @@
 class ApiConfig {
-  static const String baseUrl = 'https://hien.meonohehe.men/api';
+  // static const String baseUrl = 'https://hien.meonohehe.men/api';
+  static const String baseUrl = 'http://localhost:8000/api';
 
   static const String login = '/auth/login';
   static const String register = '/auth/register';

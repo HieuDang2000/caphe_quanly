@@ -22,10 +22,10 @@ class DatabaseSeeder extends Seeder
         $staff = Role::create(['name' => 'staff', 'display_name' => 'Nhân viên', 'description' => 'Nhân viên phục vụ']);
         $cashier = Role::create(['name' => 'cashier', 'display_name' => 'Thu ngân', 'description' => 'Thu ngân']);
 
-        User::create(['name' => 'Admin', 'email' => 'admin@coffee.vn', 'password' => 'password', 'role_id' => $admin->id, 'phone' => '0901000001']);
-        User::create(['name' => 'Quản lý', 'email' => 'manager@coffee.vn', 'password' => 'password', 'role_id' => $manager->id, 'phone' => '0901000002']);
-        User::create(['name' => 'Nhân viên A', 'email' => 'staff@coffee.vn', 'password' => 'password', 'role_id' => $staff->id, 'phone' => '0901000003']);
-        User::create(['name' => 'Thu ngân', 'email' => 'cashier@coffee.vn', 'password' => 'password', 'role_id' => $cashier->id, 'phone' => '0901000004']);
+        User::create(['name' => 'Admin', 'email' => 'admin', 'password' => 'admin', 'role_id' => $admin->id, 'phone' => '0901000001']);
+        User::create(['name' => 'Quản lý', 'email' => 'manager', 'password' => 'manager', 'role_id' => $manager->id, 'phone' => '0901000002']);
+        User::create(['name' => 'Nhân viên A', 'email' => 'staff', 'password' => 'staff', 'role_id' => $staff->id, 'phone' => '0901000003']);
+        User::create(['name' => 'Thu ngân', 'email' => 'cashier', 'password' => 'cashier', 'role_id' => $cashier->id, 'phone' => '0901000004']);
 
         // Floors & Tables
         $floor1 = Floor::create(['name' => 'Tầng trệt', 'floor_number' => 1]);

@@ -42,10 +42,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String username, String password) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await _api.post(ApiConfig.login, data: {'email': email, 'password': password});
+      final response = await _api.post(ApiConfig.login, data: {'username': username, 'password': password});
       final data = response.data;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('jwt_token', data['access_token']);
