@@ -208,7 +208,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
 
   Future<void> loadActiveOrders() async {
     try {
-      final res = await _api.get(ApiConfig.activeOrders);
+      final res = await _api.get(ApiConfig.activeOrderTables);
       if (!mounted) return;
       state = state.copyWith(activeOrders: List<Map<String, dynamic>>.from(res.data));
     } catch (_) {}

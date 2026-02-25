@@ -22,6 +22,14 @@ class _OrderTableSelectorState extends ConsumerState<OrderTableSelector> {
   bool _initialScaleApplied = false;
 
   @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      ref.read(orderProvider.notifier).loadActiveOrders();
+    });
+  }
+
+  @override
   void dispose() {
     _layoutTransformCtrl.dispose();
     super.dispose();
@@ -31,6 +39,10 @@ class _OrderTableSelectorState extends ConsumerState<OrderTableSelector> {
   Widget build(BuildContext context) {
     final layoutState = ref.watch(layoutProvider);
     final orderState = ref.watch(orderProvider);
+    final activeTableIds = orderState.activeOrders
+        .map((o) => Formatters.toNum(o['table_id']).toInt())
+        .where((id) => id > 0)
+        .toSet();
 
     if (layoutState.isLoading) return const LoadingWidget();
 
@@ -218,8 +230,14 @@ class _OrderTableSelectorState extends ConsumerState<OrderTableSelector> {
                       final type = obj['type'] as String?;
                       final id = obj['id'];
                       final isTable = type == 'table';
-                      final isSelected = isTable && id == selectedId;
-                      final child = _buildLayoutObject(obj, isSelected: isSelected);
+                      final tableId = Formatters.toNum(id).toInt();
+                      final isSelected = isTable && tableId == selectedId;
+                      final hasActiveOrder = isTable && activeTableIds.contains(tableId);
+                      final child = _buildLayoutObject(
+                        obj,
+                        isSelected: isSelected,
+                        hasActiveOrder: hasActiveOrder,
+                      );
                       if (isTable) {
                         return Positioned(
                           left: Formatters.toNum(obj['position_x']).toDouble(),
@@ -249,7 +267,11 @@ class _OrderTableSelectorState extends ConsumerState<OrderTableSelector> {
     );
   }
 
-  Widget _buildLayoutObject(Map<String, dynamic> obj, {bool isSelected = false}) {
+  Widget _buildLayoutObject(
+    Map<String, dynamic> obj, {
+    bool isSelected = false,
+    bool hasActiveOrder = false,
+  }) {
     final type = obj['type'] as String? ?? 'table';
     final w = obj['width'] != null ? Formatters.toNum(obj['width']).toDouble() : 80.0;
     final h = obj['height'] != null ? Formatters.toNum(obj['height']).toDouble() : 80.0;
@@ -262,7 +284,13 @@ class _OrderTableSelectorState extends ConsumerState<OrderTableSelector> {
     IconData icon;
     switch (type) {
       case 'table':
-        color = isSelected ? AppTheme.primaryColor : AppTheme.primaryColor;
+        if (isSelected) {
+          color = AppTheme.primaryColor;
+        } else if (hasActiveOrder) {
+          color = AppTheme.successColor;
+        } else {
+          color = AppTheme.primaryColor;
+        }
         icon = Icons.table_restaurant;
         break;
       case 'wall':

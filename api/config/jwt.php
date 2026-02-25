@@ -7,8 +7,8 @@ return [
         'private' => env('JWT_PRIVATE_KEY'),
         'passphrase' => env('JWT_PASSPHRASE'),
     ],
-    'ttl' => env('JWT_TTL', 60),
-    'refresh_ttl' => env('JWT_REFRESH_TTL', 20160),
+    'ttl' => env('JWT_TTL', 525600), // 1 năm (tính theo phút)
+    'refresh_ttl' => env('JWT_REFRESH_TTL', 525600), // 1 năm (tính theo phút)
     'algo' => env('JWT_ALGO', 'HS256'),
     'required_claims' => ['iss', 'iat', 'exp', 'nbf', 'sub', 'jti'],
     'persistent_claims' => [],

@@ -70,6 +70,7 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/', [OrderController::class, 'index']);
         Route::post('/', [OrderController::class, 'store']);
         Route::get('/active', [OrderController::class, 'active']);
+        Route::get('/active-tables', [OrderController::class, 'activeTables']);
         Route::get('/table/{tableId}', [OrderController::class, 'tableOrders']);
         Route::get('/{id}', [OrderController::class, 'show']);
         Route::put('/{id}', [OrderController::class, 'update']);

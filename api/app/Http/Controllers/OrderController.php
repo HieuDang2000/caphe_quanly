@@ -138,4 +138,20 @@ class OrderController extends Controller
 
         return response()->json($orders);
     }
+
+    /**
+     * Trả về danh sách bàn đang có đơn pending (nhẹ, chỉ theo bàn).
+     */
+    public function activeTables(): JsonResponse
+    {
+         $tables = Order::query()
+             ->selectRaw('table_id, COUNT(*) as orders_count, MAX(created_at) as latest_order_at')
+             ->where('status', 'pending')
+             ->whereNotNull('table_id')
+             ->groupBy('table_id')
+             ->orderByDesc('latest_order_at')
+             ->get();
+
+         return response()->json($tables);
+    }
 }

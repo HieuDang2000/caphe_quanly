@@ -20,6 +20,7 @@ class ApiConfig {
 
   static const String orders = '/orders';
   static const String activeOrders = '/orders/active';
+  static const String activeOrderTables = '/orders/active-tables';
   static const String orderActivities = '/orders/activities';
 
   static const String invoices = '/invoices';
