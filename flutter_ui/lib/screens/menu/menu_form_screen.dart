@@ -6,6 +6,7 @@ import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/validators.dart';
 import '../../providers/menu_provider.dart';
+import '../../widgets/responsive_layout.dart';
 
 class MenuFormScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic>? item;
@@ -113,12 +114,16 @@ class _MenuFormScreenState extends ConsumerState<MenuFormScreen> {
   @override
   Widget build(BuildContext context) {
     final menuState = ref.watch(menuProvider);
+    final mobile = isMobile(context);
 
     return Scaffold(
       appBar: AppBar(title: Text(isEditing ? 'Sửa món' : 'Thêm món')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(mobile ? 12 : 16),
+            child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -210,6 +215,8 @@ class _MenuFormScreenState extends ConsumerState<MenuFormScreen> {
               const SizedBox(height: 24),
               ElevatedButton(onPressed: _save, child: Text(isEditing ? 'Cập nhật' : 'Thêm món')),
             ],
+          ),
+        ),
           ),
         ),
       ),

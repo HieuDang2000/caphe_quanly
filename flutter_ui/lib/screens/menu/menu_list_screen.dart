@@ -5,6 +5,7 @@ import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/menu_provider.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 class MenuListScreen extends ConsumerStatefulWidget {
   const MenuListScreen({super.key});
@@ -26,6 +27,7 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
   @override
   Widget build(BuildContext context) {
     final menuState = ref.watch(menuProvider);
+    final mobile = isMobile(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -93,21 +95,18 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
                 ? const Center(child: Text('Chưa có món nào'))
                 : LayoutBuilder(
                     builder: (context, constraints) {
-                      // Mỗi ô ~ 180-220px là vừa cho web/desktop.
-                      final targetTileWidth = 200.0;
-                      final targetTileHeight = 150.0; // thấp hơn 50px
-                      final crossAxisCount =
-                          (constraints.maxWidth / targetTileWidth)
-                              .floor()
-                              .clamp(2, 6);
+                      final w = constraints.maxWidth;
+                      final crossAxisCount = w < kMobileMaxWidth
+                          ? 2
+                          : (w / 200).floor().clamp(3, 6);
 
                       return GridView.builder(
-                        padding: const EdgeInsets.all(8),
+                        padding: EdgeInsets.all(mobile ? 8 : 12),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
-                          childAspectRatio: targetTileWidth / targetTileHeight,
+                          childAspectRatio: 200 / 150,
                         ),
                         itemCount: menuState.items.length,
                         itemBuilder: (_, index) {

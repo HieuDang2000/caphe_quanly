@@ -5,6 +5,7 @@ import '../../config/app_theme.dart';
 import '../../core/network/api_client.dart';
 import '../../config/api_config.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 final reservationListProvider = FutureProvider.family<List<Map<String, dynamic>>, String?>((ref, date) async {
   final api = ref.watch(apiClientProvider);
@@ -48,6 +49,7 @@ class _ReservationScreenState extends ConsumerState<ReservationScreen> {
   @override
   Widget build(BuildContext context) {
     final reservationsAsync = ref.watch(reservationListProvider(_dateStr));
+    final mobile = isMobile(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Đặt bàn')),
@@ -58,7 +60,7 @@ class _ReservationScreenState extends ConsumerState<ReservationScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(mobile ? 8 : 12),
             child: Row(
               children: [
                 IconButton(
@@ -102,7 +104,7 @@ class _ReservationScreenState extends ConsumerState<ReservationScreen> {
               data: (reservations) => reservations.isEmpty
                   ? const Center(child: Text('Chưa có đặt bàn'))
                   : ListView.builder(
-                      padding: const EdgeInsets.all(8),
+                      padding: EdgeInsets.all(mobile ? 8 : 12),
                       itemCount: reservations.length,
                       itemBuilder: (_, index) {
                         final r = reservations[index];

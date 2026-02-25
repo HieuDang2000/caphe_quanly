@@ -5,6 +5,7 @@ import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/report_provider.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -23,6 +24,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final reportState = ref.watch(reportProvider);
+    final mobile = isMobile(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Báo cáo')),
@@ -31,7 +33,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           : RefreshIndicator(
               onRefresh: () => ref.read(reportProvider.notifier).loadAll(),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(mobile ? 12 : 16),
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,23 +55,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildDailySummary(Map<String, dynamic> summary) {
+    final mobile = isMobile(context);
+    final spacing = mobile ? 8.0 : 12.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Tổng hợp hôm nay', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 12),
-        Row(
+        SizedBox(height: spacing),
+        Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
           children: [
             _SummaryCard(title: 'Doanh thu', value: Formatters.currency(summary['total_revenue'] ?? 0), icon: Icons.attach_money, color: AppTheme.primaryColor),
-            const SizedBox(width: 12),
             _SummaryCard(title: 'Đơn hàng', value: '${summary['total_orders'] ?? 0}', icon: Icons.receipt, color: Colors.blue),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
             _SummaryCard(title: 'Hoàn thành', value: '${summary['completed_orders'] ?? 0}', icon: Icons.check_circle, color: AppTheme.successColor),
-            const SizedBox(width: 12),
             _SummaryCard(title: 'Chờ xử lý', value: '${summary['pending_orders'] ?? 0}', icon: Icons.pending, color: AppTheme.warningColor),
           ],
         ),
@@ -252,7 +251,8 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 140, maxWidth: 220),
       child: Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -263,6 +263,7 @@ class _SummaryCard extends StatelessWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(title, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                     const SizedBox(height: 4),

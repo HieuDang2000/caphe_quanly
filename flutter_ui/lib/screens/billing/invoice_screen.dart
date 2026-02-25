@@ -5,6 +5,7 @@ import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/invoice_provider.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 class InvoiceScreen extends ConsumerStatefulWidget {
   final int orderId;
@@ -25,6 +26,7 @@ class _InvoiceScreenState extends ConsumerState<InvoiceScreen> {
   Widget build(BuildContext context) {
     final invoiceState = ref.watch(invoiceProvider);
     final invoice = invoiceState.invoice;
+    final mobile = isMobile(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Hóa đơn')),
@@ -33,7 +35,7 @@ class _InvoiceScreenState extends ConsumerState<InvoiceScreen> {
           : invoice == null
               ? const Center(child: Text('Không thể tạo hóa đơn'))
               : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(mobile ? 12 : 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

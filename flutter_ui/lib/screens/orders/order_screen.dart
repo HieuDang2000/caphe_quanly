@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/layout_provider.dart';
 import '../../providers/menu_provider.dart';
+import '../../widgets/responsive_layout.dart';
 import 'order_table_selector.dart';
 import 'order_menu_picker.dart';
 import 'order_cart_bar.dart';
@@ -35,30 +36,57 @@ class _OrderScreenState extends ConsumerState<OrderScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final mobile = isMobile(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Đặt món'),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(icon: Icon(Icons.table_restaurant), text: 'Chọn bàn'),
-            Tab(icon: Icon(Icons.restaurant_menu), text: 'Chọn món'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          OrderTableSelector(
-            onNavigateToMenu: () => _tabController.animateTo(1),
+          Material(
+            color: Theme.of(context).primaryColor,
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: Colors.white,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              tabs: const [
+                Tab(icon: Icon(Icons.table_restaurant), text: 'Chọn bàn'),
+                Tab(icon: Icon(Icons.restaurant_menu), text: 'Chọn món'),
+              ],
+            ),
           ),
-          const OrderMenuPicker(),
+          Expanded(
+            child: mobile
+                ? TabBarView(
+                    controller: _tabController,
+                    children: [
+                      OrderTableSelector(
+                        onNavigateToMenu: () => _tabController.animateTo(1),
+                      ),
+                      const OrderMenuPicker(),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            OrderTableSelector(
+                              onNavigateToMenu: () => _tabController.animateTo(1),
+                            ),
+                            const OrderMenuPicker(),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(
+                        width: 360,
+                        child: OrderCartBar(),
+                      ),
+                    ],
+                  ),
+          ),
         ],
       ),
-      bottomNavigationBar: const OrderCartBar(),
+      bottomNavigationBar: mobile ? const OrderCartBar(isBottomBar: true) : null,
     );
   }
 }

@@ -6,6 +6,7 @@ import '../../core/utils/formatters.dart';
 import '../../providers/layout_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 class OrderTableSelector extends ConsumerStatefulWidget {
   const OrderTableSelector({super.key, required this.onNavigateToMenu});
@@ -41,12 +42,61 @@ class _OrderTableSelectorState extends ConsumerState<OrderTableSelector> {
     }
     final isTakeaway = selectedId == null;
 
+    final mobile = isMobile(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
+          padding: EdgeInsets.symmetric(horizontal: mobile ? 8 : 12, vertical: mobile ? 6 : 8),
+          child: mobile
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    InkWell(
+                      onTap: () {
+                        ref.read(orderProvider.notifier).selectTable(null);
+                        widget.onNavigateToMenu();
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: isTakeaway ? AppTheme.primaryColor : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isTakeaway ? AppTheme.primaryColor : Colors.grey.shade300,
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.takeout_dining,
+                              size: 28,
+                              color: isTakeaway ? Colors.white : AppTheme.primaryColor,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Bán mang đi',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: isTakeaway ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      selectedTableName != null ? 'Đang chọn: $selectedTableName' : 'Đang chọn: Mang đi',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                )
+              : Row(
             children: [
               Expanded(
                 child: InkWell(

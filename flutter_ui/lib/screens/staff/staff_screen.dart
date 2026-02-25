@@ -5,6 +5,7 @@ import '../../core/network/api_client.dart';
 import '../../config/api_config.dart';
 import '../../core/utils/formatters.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 final staffListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final api = ref.watch(apiClientProvider);
@@ -86,7 +87,7 @@ class _StaffListTab extends ConsumerWidget {
       loading: () => const LoadingWidget(),
       error: (e, _) => Center(child: Text('Lỗi: $e')),
       data: (staff) => ListView.builder(
-        padding: const EdgeInsets.all(8),
+        padding: EdgeInsets.all(isMobile(context) ? 8 : 12),
         itemCount: staff.length,
         itemBuilder: (_, index) {
           final s = staff[index];

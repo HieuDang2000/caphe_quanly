@@ -6,6 +6,7 @@ import '../../providers/menu_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/layout_provider.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 class OrderMenuPicker extends ConsumerStatefulWidget {
   const OrderMenuPicker({super.key});
@@ -32,6 +33,8 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
     final menuState = ref.watch(menuProvider);
     final orderState = ref.watch(orderProvider);
     final layoutState = ref.watch(layoutProvider);
+
+    final isTableMode = orderState.selectedTableId != null;
 
     final selectedId = orderState.selectedTableId;
     String displayLabel;
@@ -121,22 +124,30 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                     return LayoutBuilder(
                       builder: (context, constraints) {
                         final width = constraints.maxWidth;
-                        int crossAxisCount = 2;
-                        if (width < 500) {
-                          crossAxisCount = 3;
-                        } else if (width < 900) {
-                          crossAxisCount = 5;
+                        int crossAxisCount;
+                        if (width < kMobileMaxWidth) {
+                          crossAxisCount = 2;
+                        } else if (width < kTabletMaxWidth) {
+                          crossAxisCount = 4;
                         } else {
                           crossAxisCount = 6;
                         }
+
+                        // Tính toán tỉ lệ linh động dựa trên bề rộng cột để tăng chiều cao item,
+                        // tránh bị overflow khi nội dung nhiều.
+                        const spacing = 8.0;
+                        final totalSpacing = (crossAxisCount - 1) * spacing;
+                        final itemWidth = (width - totalSpacing) / crossAxisCount;
+                        const minItemHeight = 180.0;
+                        final childAspectRatio = itemWidth / minItemHeight;
 
                         return GridView.builder(
                           padding: const EdgeInsets.all(8),
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: crossAxisCount,
-                            mainAxisSpacing: 8,
-                            crossAxisSpacing: 8,
-                            childAspectRatio: 5 / 4,
+                            mainAxisSpacing: spacing,
+                            crossAxisSpacing: spacing,
+                            childAspectRatio: childAspectRatio,
                           ),
                           itemCount: filteredItems.length,
                           itemBuilder: (_, index) {
@@ -144,7 +155,7 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                             if (item['is_available'] == false) return const SizedBox.shrink();
                             final itemId = item['id'] as int;
                             final inCart = orderState.cartItems.where((c) => c['menu_item_id'] == item['id']);
-                            final cartEntry = inCart.isEmpty ? null : inCart.first;
+                            final cartEntry = !isTableMode && inCart.isNotEmpty ? inCart.first : null;
                             final qty = cartEntry != null ? Formatters.toNum(cartEntry['quantity']).toInt() : 0;
                             final itemNote = cartEntry != null ? cartEntry['notes'] as String? : null;
                             final existingOpts = cartEntry != null ? (cartEntry['options'] as List?)?.cast<Map<String, dynamic>>() : null;
@@ -220,6 +231,7 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                               ),
                                               maxLines: 1,
                                               onChanged: (v) {
+                                                if (isTableMode) return;
                                                 final trimmed = v.trim();
                                                 final newNote = trimmed.isEmpty ? null : trimmed;
                                                 if (cartEntry != null) {
@@ -233,7 +245,36 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                               },
                                             ),
                                           ),
-                                          if (qty > 0) ...[
+                                          if (isTableMode)
+                                            IconButton(
+                                              icon: const Icon(Icons.add_circle, color: AppTheme.primaryColor),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              onPressed: () async {
+                                                final tableId = orderState.selectedTableId;
+                                                if (tableId == null) return;
+                                                final trimmed = noteController.text.trim();
+                                                final note = trimmed.isEmpty ? null : trimmed;
+                                                final existingItems =
+                                                    (orderState.currentOrder?['items'] as List?)?.cast<Map<String, dynamic>>() ??
+                                                        <Map<String, dynamic>>[];
+                                                final newItems = [
+                                                  ...existingItems,
+                                                  {
+                                                    'menu_item_id': itemId,
+                                                    'name': item['name'],
+                                                    'price': basePrice,
+                                                    'quantity': 1,
+                                                    'notes': note,
+                                                    'options': <Map<String, dynamic>>[],
+                                                  },
+                                                ];
+                                                await ref
+                                                    .read(orderProvider.notifier)
+                                                    .saveTableOrderItems(tableId, newItems);
+                                              },
+                                            )
+                                          else if (qty > 0) ...[
                                             IconButton(
                                               icon: const Icon(Icons.remove_circle_outline, size: 20),
                                               padding: EdgeInsets.zero,

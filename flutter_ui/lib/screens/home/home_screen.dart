@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/responsive_layout.dart';
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -12,7 +14,8 @@ class HomeScreen extends ConsumerWidget {
     final user = authState.user;
     final role = user?['role']?['name'] ?? 'staff';
 
-    final maxContentWidth = 800.0;
+    final mobile = isMobile(context);
+    final maxContentWidth = mobile ? double.infinity : 800.0;
     const maxTileExtent = 220.0;
 
     return Scaffold(
@@ -21,7 +24,7 @@ class HomeScreen extends ConsumerWidget {
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxContentWidth),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(mobile ? 12 : 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -66,7 +69,9 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             LayoutBuilder(
               builder: (context, constraints) {
-                final crossAxisCount = (constraints.maxWidth / maxTileExtent).floor().clamp(2, 4);
+                final crossAxisCount = mobile
+                    ? 2
+                    : (constraints.maxWidth / maxTileExtent).floor().clamp(3, 4);
                 return GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),

@@ -6,6 +6,7 @@ import '../../providers/order_provider.dart';
 import '../../providers/invoice_provider.dart';
 import '../../services/receipt_printer.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 /// Ngày hôm nay theo giờ Việt Nam (UTC+7), định dạng YYYY-MM-DD.
 String _todayVietnam() {
@@ -69,6 +70,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
   @override
   Widget build(BuildContext context) {
     final orderState = ref.watch(orderProvider);
+    final mobile = isMobile(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -96,7 +98,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: EdgeInsets.symmetric(horizontal: mobile ? 8 : 12, vertical: mobile ? 6 : 8),
             child: InkWell(
               onTap: _pickDate,
               borderRadius: BorderRadius.circular(8),
@@ -128,9 +130,13 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                     onRefresh: () => ref.read(orderProvider.notifier).loadOrders(status: _statusFilter, date: _selectedDate),
                     child: orderState.orders.isEmpty
                   ? const Center(child: Text('Chưa có đơn hàng'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: orderState.orders.length,
+                  : Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: mobile ? double.infinity : 800),
+                        child: ListView.builder(
+                          padding: EdgeInsets.all(mobile ? 8 : 12),
+                          itemCount: orderState.orders.length,
                       itemBuilder: (_, index) {
                         final order = orderState.orders[index];
                         final status = order['status'] as String? ?? 'pending';
@@ -142,20 +148,35 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                         } catch (_) {}
 
                         return Card(
+                          margin: EdgeInsets.only(bottom: mobile ? 6 : 8),
                           child: ExpansionTile(
                             initiallyExpanded: status != 'paid',
                             leading: CircleAvatar(
                               backgroundColor: _statusColor(status).withValues(alpha: 0.15),
                               child: Icon(Icons.receipt, color: _statusColor(status)),
                             ),
-                            title: Row(children: [
-                              Text(isTakeaway ? 'Bán mang đi : ' : '${order['table']?['name'] ?? ''} : ', style: const TextStyle(fontWeight: FontWeight.bold)),
-                              Text(order['order_number'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                              if (orderTime != null) ...[
-                                const SizedBox(width: 8),
-                                Text(Formatters.shortDateTime(orderTime), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                              ],
-                            ]),
+                            title: mobile
+                                ? Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '${isTakeaway ? 'Bán mang đi' : order['table']?['name'] ?? ''} · ${order['order_number'] ?? ''}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (orderTime != null)
+                                        Text(Formatters.shortDateTime(orderTime), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                    ],
+                                  )
+                                : Row(children: [
+                                    Flexible(child: Text(isTakeaway ? 'Bán mang đi : ' : '${order['table']?['name'] ?? ''} : ', style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                                    Text(order['order_number'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    if (orderTime != null) ...[
+                                      const SizedBox(width: 8),
+                                      Text(Formatters.shortDateTime(orderTime), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                    ],
+                                  ]),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -302,6 +323,8 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                           ),
                         );
                       },
+                        ),
+                      ),
                     ),
                   ),
           ),

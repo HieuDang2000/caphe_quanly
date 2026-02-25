@@ -5,6 +5,7 @@ import '../../core/network/api_client.dart';
 import '../../config/api_config.dart';
 import '../../core/utils/formatters.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 final inventoryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final api = ref.watch(apiClientProvider);
@@ -18,6 +19,7 @@ class InventoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final inventoryAsync = ref.watch(inventoryProvider);
+    final mobile = isMobile(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -38,7 +40,7 @@ class InventoryScreen extends ConsumerWidget {
         loading: () => const LoadingWidget(),
         error: (e, _) => Center(child: Text('Lỗi: $e')),
         data: (items) => ListView.builder(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(mobile ? 8 : 12),
           itemCount: items.length,
           itemBuilder: (_, index) {
             final item = items[index];

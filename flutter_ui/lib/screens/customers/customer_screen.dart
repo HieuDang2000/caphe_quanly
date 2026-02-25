@@ -4,6 +4,7 @@ import '../../config/app_theme.dart';
 import '../../core/network/api_client.dart';
 import '../../config/api_config.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 final customerListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final api = ref.watch(apiClientProvider);
@@ -35,6 +36,7 @@ class CustomerScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final customersAsync = ref.watch(customerListProvider);
+    final mobile = isMobile(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Khách hàng thân thiết')),
@@ -46,7 +48,7 @@ class CustomerScreen extends ConsumerWidget {
         loading: () => const LoadingWidget(),
         error: (e, _) => Center(child: Text('Lỗi: $e')),
         data: (customers) => ListView.builder(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(mobile ? 8 : 12),
           itemCount: customers.length,
           itemBuilder: (_, index) {
             final c = customers[index];

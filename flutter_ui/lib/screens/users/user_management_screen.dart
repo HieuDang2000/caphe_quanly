@@ -4,6 +4,7 @@ import '../../config/app_theme.dart';
 import '../../core/network/api_client.dart';
 import '../../config/api_config.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 final userListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final api = ref.watch(apiClientProvider);
@@ -17,6 +18,7 @@ class UserManagementScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final usersAsync = ref.watch(userListProvider);
+    final mobile = isMobile(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Quản lý Users')),
@@ -24,7 +26,7 @@ class UserManagementScreen extends ConsumerWidget {
         loading: () => const LoadingWidget(),
         error: (e, _) => Center(child: Text('Lỗi: $e')),
         data: (users) => ListView.builder(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(mobile ? 8 : 12),
           itemCount: users.length,
           itemBuilder: (_, index) {
             final user = users[index];

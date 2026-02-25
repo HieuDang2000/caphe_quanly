@@ -6,6 +6,7 @@ import '../../core/utils/formatters.dart';
 import '../../providers/invoice_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final int invoiceId;
@@ -70,6 +71,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget build(BuildContext context) {
     final invoiceState = ref.watch(invoiceProvider);
     final invoice = invoiceState.invoice;
+    final mobile = isMobile(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Thanh toán')),
@@ -78,7 +80,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           : invoice == null
               ? const Center(child: Text('Không tìm thấy hóa đơn'))
               : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(mobile ? 12 : 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [

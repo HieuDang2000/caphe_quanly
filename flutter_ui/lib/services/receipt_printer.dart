@@ -147,12 +147,16 @@ class ReceiptPrinter {
                     final qty = _toNum(item['quantity']);
                     final subtotal = _toNum(item['subtotal']);
                     final unitPrice = qty > 0 ? subtotal / qty : 0.0;
+                    final isPaid = item['is_paid'] == true;
+                    final rowStyle = isPaid
+                        ? base.copyWith(decoration: pw.TextDecoration.lineThrough, color: PdfColors.grey600)
+                        : base;
                     return pw.TableRow(children: [
-                      _cell('${i + 1}', base, center: true),
-                      _cell(item['menu_item']?['name']?.toString() ?? '', base),
-                      _cell('${qty.toInt()}', base, center: true),
-                      _cell(_formatCurrency(unitPrice), base, right: true),
-                      _cell(_formatCurrency(subtotal), base, right: true),
+                      _cell('${i + 1}', rowStyle, center: true),
+                      _cell(item['menu_item']?['name']?.toString() ?? '', rowStyle),
+                      _cell('${qty.toInt()}', rowStyle, center: true),
+                      _cell(_formatCurrency(unitPrice), rowStyle, right: true),
+                      _cell(_formatCurrency(subtotal), rowStyle, right: true),
                     ]);
                   }),
                 ],
@@ -282,26 +286,32 @@ class ReceiptPrinter {
                     ],
                   ),
                   ...items.map(
-                    (item) => pw.TableRow(
-                      children: [
-                        pw.Text(
-                          item['menu_item']?['name']?.toString() ?? '',
-                          style: baseStyle.copyWith(fontSize: 7),
-                        ),
-                        pw.Align(
-                          alignment: pw.Alignment.center,
-                          child: pw.Text('${item['quantity']}', style: baseStyle.copyWith(fontSize: 7)),
-                        ),
-                        pw.Align(
-                          alignment: pw.Alignment.centerRight,
-                          child: pw.Text(
-                            _formatCurrency(item['subtotal']),
-                            style: baseStyle.copyWith(fontSize: 7),
+                    (item) {
+                      final isPaid = item['is_paid'] == true;
+                      final lineStyle = isPaid
+                          ? baseStyle.copyWith(fontSize: 7, decoration: pw.TextDecoration.lineThrough, color: PdfColors.grey600)
+                          : baseStyle.copyWith(fontSize: 7);
+                      return pw.TableRow(
+                        children: [
+                          pw.Text(
+                            item['menu_item']?['name']?.toString() ?? '',
+                            style: lineStyle,
                           ),
-                        ),
-                        pw.Divider(thickness: 0.5, height: 0.5),
-                      ],
-                    ),
+                          pw.Align(
+                            alignment: pw.Alignment.center,
+                            child: pw.Text('${item['quantity']}', style: lineStyle),
+                          ),
+                          pw.Align(
+                            alignment: pw.Alignment.centerRight,
+                            child: pw.Text(
+                              _formatCurrency(item['subtotal']),
+                              style: lineStyle,
+                            ),
+                          ),
+                          pw.Divider(thickness: 0.5, height: 0.5),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),

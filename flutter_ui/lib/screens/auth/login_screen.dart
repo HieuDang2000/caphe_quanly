@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/responsive_layout.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -44,7 +45,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       backgroundColor: AppTheme.backgroundColor,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.all(isMobile(context) ? 24 : 32),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 400),
             child: Form(

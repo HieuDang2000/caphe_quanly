@@ -30,13 +30,14 @@ class OrderState {
     List<Map<String, dynamic>>? cartItems,
     int? selectedTableId,
     bool clearSelectedTable = false,
+    bool clearCurrentOrder = false,
     bool? isLoading,
     String? error,
   }) {
     return OrderState(
       orders: orders ?? this.orders,
       activeOrders: activeOrders ?? this.activeOrders,
-      currentOrder: currentOrder ?? this.currentOrder,
+      currentOrder: clearCurrentOrder ? null : (currentOrder ?? this.currentOrder),
       cartItems: cartItems ?? this.cartItems,
       selectedTableId: clearSelectedTable ? null : (selectedTableId ?? this.selectedTableId),
       isLoading: isLoading ?? this.isLoading,
@@ -86,7 +87,11 @@ class OrderNotifier extends StateNotifier<OrderState> {
     state = state.copyWith(
       selectedTableId: tableId,
       clearSelectedTable: tableId == null,
+      clearCurrentOrder: tableId != null,
     );
+    if (tableId != null) {
+      loadTableActiveOrder(tableId);
+    }
   }
 
   void addToCart(Map<String, dynamic> menuItem, {String? notes, int quantity = 1, List<Map<String, dynamic>>? options}) {
@@ -207,6 +212,104 @@ class OrderNotifier extends StateNotifier<OrderState> {
       if (!mounted) return;
       state = state.copyWith(activeOrders: List<Map<String, dynamic>>.from(res.data));
     } catch (_) {}
+  }
+
+  Future<void> loadTableActiveOrder(int tableId) async {
+    try {
+      final res = await _api.get('${ApiConfig.orders}/table/$tableId');
+      final list = res.data is List
+          ? List<Map<String, dynamic>>.from(res.data)
+          : <Map<String, dynamic>>[];
+      Map<String, dynamic>? order;
+      if (list.isNotEmpty) {
+        order = Map<String, dynamic>.from(list.first);
+      }
+      state = state.copyWith(
+        currentOrder: order,
+        selectedTableId: tableId,
+      );
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
+  /// Xóa đơn hiện tại khỏi state (reset cart bar sau thanh toán toàn bộ).
+  void clearCurrentOrder() {
+    state = state.copyWith(clearCurrentOrder: true);
+  }
+
+  /// Load đơn theo ID và cập nhật currentOrder nếu đúng bàn đang chọn (dùng sau thanh toán một phần).
+  Future<void> loadOrderById(int orderId) async {
+    try {
+      final res = await _api.get('${ApiConfig.orders}/$orderId');
+      final order = Map<String, dynamic>.from(res.data);
+      final tableId = Formatters.toNum(order['table_id']).toInt();
+      if (state.selectedTableId == tableId) {
+        state = state.copyWith(currentOrder: order, selectedTableId: tableId);
+      }
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
+  Future<Map<String, dynamic>?> saveTableOrderItems(
+    int tableId,
+    List<Map<String, dynamic>> items, {
+    String? notes,
+    int? customerId,
+  }) async {
+    if (items.isEmpty) return null;
+    state = state.copyWith(isLoading: true);
+    try {
+      final payloadItems = items.map((i) {
+        final opts = (i['options'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+        return {
+          'menu_item_id': i['menu_item_id'],
+          'quantity': i['quantity'],
+          'notes': i['notes'],
+          'options': opts
+              .map((o) => {
+                    'id': o['id'],
+                    'name': o['name'],
+                    'extra_price': o['extra_price'],
+                  })
+              .toList(),
+        };
+      }).toList();
+
+      final current = state.currentOrder;
+      final orderBelongsToTable = current != null &&
+          Formatters.toNum(current['table_id']).toInt() == tableId;
+      final res = orderBelongsToTable
+          ? await _api.put(
+              '${ApiConfig.orders}/${current['id']}',
+              data: {
+                'items': payloadItems,
+                if (notes != null) 'notes': notes,
+                if (customerId != null) 'customer_id': customerId,
+              },
+            )
+          : await _api.post(
+              ApiConfig.orders,
+              data: {
+                'table_id': tableId,
+                'customer_id': customerId,
+                'notes': notes,
+                'items': payloadItems,
+              },
+            );
+
+      final order = Map<String, dynamic>.from(res.data);
+      state = state.copyWith(
+        isLoading: false,
+        currentOrder: order,
+        selectedTableId: tableId,
+      );
+      return order;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return null;
+    }
   }
 
   Future<void> updateStatus(int orderId, String status, {String? statusFilter, String? date}) async {

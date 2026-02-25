@@ -18,17 +18,19 @@ class MenuState {
     this.error,
   });
 
+  static const _undefined = Object();
+
   MenuState copyWith({
     List<Map<String, dynamic>>? categories,
     List<Map<String, dynamic>>? items,
-    int? selectedCategoryId,
+    Object? selectedCategoryId = _undefined,
     bool? isLoading,
     String? error,
   }) {
     return MenuState(
       categories: categories ?? this.categories,
       items: items ?? this.items,
-      selectedCategoryId: selectedCategoryId ?? this.selectedCategoryId,
+      selectedCategoryId: selectedCategoryId == _undefined ? this.selectedCategoryId : selectedCategoryId as int?,
       isLoading: isLoading ?? this.isLoading,
       error: error,
     );

@@ -5,6 +5,7 @@ import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/layout_provider.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/responsive_layout.dart';
 
 class LayoutEditorScreen extends ConsumerStatefulWidget {
   const LayoutEditorScreen({super.key});
@@ -106,6 +107,7 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final layoutState = ref.watch(layoutProvider);
+    final mobile = isMobile(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -135,7 +137,7 @@ class _LayoutEditorScreenState extends ConsumerState<LayoutEditorScreen> {
               height: 50,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: mobile ? 8 : 12, vertical: 8),
                 itemCount: layoutState.floors.length,
                 itemBuilder: (_, index) {
                   final floor = layoutState.floors[index];
