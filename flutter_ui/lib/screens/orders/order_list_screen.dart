@@ -143,23 +143,22 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
 
                         return Card(
                           child: ExpansionTile(
+                            initiallyExpanded: status != 'paid',
                             leading: CircleAvatar(
                               backgroundColor: _statusColor(status).withValues(alpha: 0.15),
                               child: Icon(Icons.receipt, color: _statusColor(status)),
                             ),
-                            title: Text(order['order_number'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            title: Row(children: [
+                              Text(isTakeaway ? 'Bán mang đi : ' : '${order['table']?['name'] ?? ''} : ', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text(order['order_number'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              if (orderTime != null) ...[
+                                const SizedBox(width: 8),
+                                Text(Formatters.shortDateTime(orderTime), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                              ],
+                            ]),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Text(isTakeaway ? 'Bán mang đi' : '${order['table']?['name'] ?? ''}'),
-                                    if (orderTime != null) ...[
-                                      const SizedBox(width: 8),
-                                      Text(Formatters.shortDateTime(orderTime), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                                    ],
-                                  ],
-                                ),
                                 Row(
                                   children: [
                                     Container(
@@ -242,7 +241,8 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                               Padding(
                                 padding: const EdgeInsets.all(12),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  spacing: 8,
                                   children: [
                                     if (status == 'pending') ...[
                                       ElevatedButton(
@@ -261,7 +261,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                             _selectedItemsByOrder[orderId] = <int>{};
                                           });
                                         },
-                                        child: const Text('Thanh toán đã chọn'),
+                                        child: const Text('Thanh toán một phần'),
                                       ),
                                     ],
                                     if (status == 'paid')

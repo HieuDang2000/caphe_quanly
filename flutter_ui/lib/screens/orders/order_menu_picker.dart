@@ -16,6 +16,16 @@ class OrderMenuPicker extends ConsumerStatefulWidget {
 
 class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
   String _menuSearchQuery = '';
+  final Map<int, TextEditingController> _noteControllers = {};
+
+  @override
+  void dispose() {
+    for (final controller in _noteControllers.values) {
+      controller.dispose();
+    }
+    _noteControllers.clear();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,120 +118,174 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                             final name = (item['name'] as String? ?? '').toLowerCase();
                             return name.contains(query);
                           }).toList();
-                    return ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: filteredItems.length,
-                      itemBuilder: (_, index) {
-                        final item = filteredItems[index];
-                        if (item['is_available'] == false) return const SizedBox.shrink();
-                        final inCart = orderState.cartItems.where((c) => c['menu_item_id'] == item['id']);
-                        final cartEntry = inCart.isEmpty ? null : inCart.first;
-                        final qty = cartEntry != null ? Formatters.toNum(cartEntry['quantity']).toInt() : 0;
-                        final itemNote = cartEntry != null ? cartEntry['notes'] as String? : null;
-                        final existingOpts = cartEntry != null ? (cartEntry['options'] as List?)?.cast<Map<String, dynamic>>() : null;
-                        final hasNote = itemNote != null && itemNote.trim().isNotEmpty;
-                        final basePrice = Formatters.toNum(item['price']);
-                        final itemOpts = (item['options'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-                        final hasItemOpts = itemOpts.isNotEmpty;
-                        final optsExtra = (existingOpts ?? []).fold<double>(0, (s, o) => s + Formatters.toNum(o['extra_price']));
-                        final displayPrice = basePrice + optsExtra;
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        int crossAxisCount = 2;
+                        if (width < 500) {
+                          crossAxisCount = 3;
+                        } else if (width < 900) {
+                          crossAxisCount = 5;
+                        } else {
+                          crossAxisCount = 6;
+                        }
 
-                        return Card(
-                          child: ListTile(
-                            onTap: () => _showAddOrEditItemDialog(
-                              item: item,
-                              existingQty: qty,
-                              existingNote: itemNote,
-                              existingOptions: existingOpts,
-                            ),
-                            title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  hasItemOpts && (existingOpts ?? []).isEmpty
-                                      ? 'Từ ${Formatters.currency(displayPrice)}'
-                                      : Formatters.currency(displayPrice),
-                                ),
-                                if (hasItemOpts && (existingOpts ?? []).isEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      itemOpts
-                                          .map((o) => '${o['name']} +${Formatters.currency(o['extra_price'])}')
-                                          .join(' · '),
-                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                if ((existingOpts ?? []).isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      (existingOpts ?? [])
-                                          .map((o) => '${o['name']} +${Formatters.currency(o['extra_price'])}')
-                                          .join(' · '),
-                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                if (hasNote)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      itemNote,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade600,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            trailing: qty > 0
-                                ? Row(
-                                    mainAxisSize: MainAxisSize.min,
+                        return GridView.builder(
+                          padding: const EdgeInsets.all(8),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                            childAspectRatio: 5 / 4,
+                          ),
+                          itemCount: filteredItems.length,
+                          itemBuilder: (_, index) {
+                            final item = filteredItems[index];
+                            if (item['is_available'] == false) return const SizedBox.shrink();
+                            final itemId = item['id'] as int;
+                            final inCart = orderState.cartItems.where((c) => c['menu_item_id'] == item['id']);
+                            final cartEntry = inCart.isEmpty ? null : inCart.first;
+                            final qty = cartEntry != null ? Formatters.toNum(cartEntry['quantity']).toInt() : 0;
+                            final itemNote = cartEntry != null ? cartEntry['notes'] as String? : null;
+                            final existingOpts = cartEntry != null ? (cartEntry['options'] as List?)?.cast<Map<String, dynamic>>() : null;
+                            final basePrice = Formatters.toNum(item['price']);
+                            final itemOpts = (item['options'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+                            final hasItemOpts = itemOpts.isNotEmpty;
+                            final optsExtra = (existingOpts ?? []).fold<double>(0, (s, o) => s + Formatters.toNum(o['extra_price']));
+                            final displayPrice = basePrice + optsExtra;
+
+                            final noteController = _noteControllers[itemId] ??
+                                TextEditingController(text: itemNote ?? '');
+                            _noteControllers[itemId] = noteController;
+
+                            return Card(
+                              child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove_circle_outline),
-                                        onPressed: () => ref.read(orderProvider.notifier).updateCartQuantity(
-                                              item['id'],
-                                              qty - 1,
-                                              options: existingOpts,
-                                              notes: itemNote,
-                                            ),
-                                      ),
-                                      Text('$qty',
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.bold, fontSize: 16)),
-                                      IconButton(
-                                        icon: const Icon(Icons.add_circle_outline),
-                                        onPressed: () => _showAddOrEditItemDialog(
-                                          item: item,
-                                          existingQty: 0,
-                                          existingNote: null,
-                                          existingOptions: null,
+                                      Text(
+                                        item['name'],
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
                                         ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        hasItemOpts && (existingOpts ?? []).isEmpty
+                                            ? 'Từ ${Formatters.currency(displayPrice)}'
+                                            : Formatters.currency(displayPrice),
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                      if (hasItemOpts && (existingOpts ?? []).isEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 2),
+                                          child: Text(
+                                            itemOpts
+                                                .map((o) => '${o['name']} +${Formatters.currency(o['extra_price'])}')
+                                                .join(' · '),
+                                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      if ((existingOpts ?? []).isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 2),
+                                          child: Text(
+                                            (existingOpts ?? [])
+                                                .map((o) => '${o['name']} +${Formatters.currency(o['extra_price'])}')
+                                                .join(' · '),
+                                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      const SizedBox(height: 3),
+                                      const Spacer(),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextField(
+                                              controller: noteController,
+                                              decoration: const InputDecoration(
+                                                hintText: 'Ghi chú',
+                                                isDense: true,
+                                                hintStyle: TextStyle(fontSize: 12),
+                                                border: OutlineInputBorder(),
+                                                contentPadding: EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                                              ),
+                                              maxLines: 1,
+                                              onChanged: (v) {
+                                                final trimmed = v.trim();
+                                                final newNote = trimmed.isEmpty ? null : trimmed;
+                                                if (cartEntry != null) {
+                                                  ref.read(orderProvider.notifier).updateCartItemNote(
+                                                        itemId,
+                                                        newNote,
+                                                        options: existingOpts,
+                                                        notes: itemNote,
+                                                      );
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                          if (qty > 0) ...[
+                                            IconButton(
+                                              icon: const Icon(Icons.remove_circle_outline, size: 20),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              onPressed: () => ref.read(orderProvider.notifier).updateCartQuantity(
+                                                    itemId,
+                                                    qty - 1,
+                                                    options: existingOpts,
+                                                    notes: itemNote,
+                                                  ),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                                              child: Text(
+                                                '$qty',
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.add_circle_outline, size: 20),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              onPressed: () => ref.read(orderProvider.notifier).updateCartQuantity(
+                                                    itemId,
+                                                    qty + 1,
+                                                    options: existingOpts,
+                                                    notes: itemNote,
+                                                  ),
+                                            ),
+                                          ] else
+                                            IconButton(
+                                              icon: const Icon(Icons.add_circle, color: AppTheme.primaryColor),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              onPressed: () {
+                                                final trimmed = noteController.text.trim();
+                                                final note = trimmed.isEmpty ? null : trimmed;
+                                                ref.read(orderProvider.notifier).addToCart(
+                                                      item,
+                                                      notes: note,
+                                                      quantity: 1,
+                                                      options: null,
+                                                    );
+                                              },
+                                            ),
+                                        ],
                                       ),
                                     ],
-                                  )
-                                : IconButton(
-                                    icon:
-                                        const Icon(Icons.add_circle, color: AppTheme.primaryColor),
-                                    onPressed: () => _showAddOrEditItemDialog(
-                                      item: item,
-                                      existingQty: 0,
-                                      existingNote: null,
-                                      existingOptions: null,
-                                    ),
                                   ),
-                          ),
+                              ),
+                            );
+                          },
                         );
                       },
                     );
@@ -232,160 +296,5 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
     );
   }
 
-  void _showAddOrEditItemDialog({
-    required Map<String, dynamic> item,
-    required int existingQty,
-    String? existingNote,
-    List<Map<String, dynamic>>? existingOptions,
-  }) {
-    final orderNotifier = ref.read(orderProvider.notifier);
-
-    int quantity = existingQty > 0 ? existingQty : 1;
-    final noteController = TextEditingController(text: existingNote ?? '');
-    final itemOptions = (item['options'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    List<Map<String, dynamic>> selectedOptions =
-        existingOptions != null ? List.from(existingOptions) : [];
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final basePrice = Formatters.toNum(item['price']);
-          final optionsExtra =
-              selectedOptions.fold<double>(0, (s, o) => s + Formatters.toNum(o['extra_price']));
-          final unitPrice = basePrice + optionsExtra;
-          final lineTotal = unitPrice * quantity;
-
-          return AlertDialog(
-            title: Text(existingQty > 0 ? 'Sửa món' : 'Thêm món'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item['name'],
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                  Text(Formatters.currency(unitPrice),
-                      style: TextStyle(color: Colors.grey.shade600)),
-                  if (selectedOptions.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text('Tổng dòng: ${Formatters.currency(lineTotal)}',
-                          style: const TextStyle(fontWeight: FontWeight.w500)),
-                    ),
-                  const SizedBox(height: 16),
-                  if (itemOptions.isNotEmpty) ...[
-                    const Text('Tuỳ chọn:', style: TextStyle(fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: itemOptions.map((opt) {
-                        final id = opt['id'];
-                        final name = opt['name'] as String? ?? '';
-                        final extra = Formatters.toNum(opt['extra_price']).toInt();
-                        final isSelected = selectedOptions
-                            .any((s) => Formatters.toNum(s['id']).toInt() == Formatters.toNum(id).toInt());
-                        return FilterChip(
-                          label: Text('$name +${Formatters.currency(extra)}'),
-                          selected: isSelected,
-                          selectedColor: AppTheme.primaryColor.withValues(alpha: 0.3),
-                          onSelected: (v) {
-                            setDialogState(() {
-                              if (v) {
-                                selectedOptions = [
-                                  ...selectedOptions,
-                                  {'id': id, 'name': name, 'extra_price': extra}
-                                ];
-                              } else {
-                                selectedOptions = selectedOptions
-                                    .where((s) =>
-                                        Formatters.toNum(s['id']).toInt() !=
-                                        Formatters.toNum(id).toInt())
-                                    .toList();
-                              }
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Row(
-                    children: [
-                      const Text('Số lượng: '),
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: quantity <= 1
-                            ? null
-                            : () => setDialogState(() => quantity = quantity - 1),
-                      ),
-                      Text('$quantity',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 18)),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline),
-                        onPressed: () => setDialogState(() => quantity = quantity + 1),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: noteController,
-                    decoration: const InputDecoration(
-                      labelText: 'Ghi chú cho món',
-                      hintText: 'VD: Ít đường, nhiều đá...',
-                    ),
-                    maxLines: 2,
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Hủy'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  final note =
-                      noteController.text.trim().isEmpty ? null : noteController.text.trim();
-                  if (existingQty > 0) {
-                    orderNotifier.updateCartQuantity(
-                      item['id'],
-                      quantity,
-                      options: existingOptions,
-                      notes: existingNote,
-                    );
-                    orderNotifier.updateCartItemNote(
-                      item['id'],
-                      note,
-                      options: existingOptions,
-                      notes: existingNote,
-                    );
-                    orderNotifier.updateCartItemOptions(
-                      item['id'],
-                      selectedOptions,
-                      currentOptions: existingOptions,
-                      currentNotes: existingNote,
-                    );
-                  } else {
-                    orderNotifier.addToCart(
-                      item,
-                      notes: note,
-                      quantity: quantity,
-                      options: selectedOptions,
-                    );
-                  }
-                },
-                child: Text(existingQty > 0 ? 'Cập nhật' : 'Thêm vào giỏ'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
 }
 
