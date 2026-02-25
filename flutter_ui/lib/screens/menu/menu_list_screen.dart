@@ -106,7 +106,7 @@ class _MenuListScreenState extends ConsumerState<MenuListScreen> {
                           crossAxisCount: crossAxisCount,
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
-                          childAspectRatio: 200 / 150,
+                          childAspectRatio: 6 / 5,
                         ),
                         itemCount: menuState.items.length,
                         itemBuilder: (_, index) {

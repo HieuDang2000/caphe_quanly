@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/network/api_client.dart';
 import '../core/utils/formatters.dart';
-import '../config/api_config.dart';
+import '../repositories/order_repository.dart';
 
 class OrderState {
   final List<Map<String, dynamic>> orders;
@@ -78,10 +77,10 @@ class OrderState {
 }
 
 class OrderNotifier extends StateNotifier<OrderState> {
-  final ApiClient _api;
+  final OrderRepository _repo;
   Timer? _pollTimer;
 
-  OrderNotifier(this._api) : super(const OrderState());
+  OrderNotifier(this._repo) : super(const OrderState());
 
   void selectTable(int? tableId) {
     state = state.copyWith(
@@ -178,8 +177,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
           };
         }).toList(),
       };
-      final res = await _api.post(ApiConfig.orders, data: data);
-      final order = Map<String, dynamic>.from(res.data);
+      final order = await _repo.createOrder(data);
       clearCart();
       state = state.copyWith(isLoading: false, currentOrder: order);
       return order;
@@ -193,13 +191,9 @@ class OrderNotifier extends StateNotifier<OrderState> {
     if (!mounted) return;
     state = state.copyWith(isLoading: true);
     try {
-      final params = <String, dynamic>{};
-      if (status != null) params['status'] = status;
-      if (date != null) params['date'] = date;
-      final res = await _api.get(ApiConfig.orders, queryParameters: params);
+      final data = await _repo.getOrders(status: status, date: date);
       if (!mounted) return;
-      final data = res.data is Map ? res.data['data'] : res.data;
-      state = state.copyWith(orders: List<Map<String, dynamic>>.from(data), isLoading: false);
+      state = state.copyWith(orders: data, isLoading: false);
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -208,18 +202,15 @@ class OrderNotifier extends StateNotifier<OrderState> {
 
   Future<void> loadActiveOrders() async {
     try {
-      final res = await _api.get(ApiConfig.activeOrderTables);
+      final data = await _repo.getActiveOrderTables();
       if (!mounted) return;
-      state = state.copyWith(activeOrders: List<Map<String, dynamic>>.from(res.data));
+      state = state.copyWith(activeOrders: data);
     } catch (_) {}
   }
 
   Future<void> loadTableActiveOrder(int tableId) async {
     try {
-      final res = await _api.get('${ApiConfig.orders}/table/$tableId');
-      final list = res.data is List
-          ? List<Map<String, dynamic>>.from(res.data)
-          : <Map<String, dynamic>>[];
+      final list = await _repo.getTableOrders(tableId);
       Map<String, dynamic>? order;
       if (list.isNotEmpty) {
         order = Map<String, dynamic>.from(list.first);
@@ -233,16 +224,14 @@ class OrderNotifier extends StateNotifier<OrderState> {
     }
   }
 
-  /// Xóa đơn hiện tại khỏi state (reset cart bar sau thanh toán toàn bộ).
   void clearCurrentOrder() {
     state = state.copyWith(clearCurrentOrder: true);
   }
 
-  /// Load đơn theo ID và cập nhật currentOrder nếu đúng bàn đang chọn (dùng sau thanh toán một phần).
   Future<void> loadOrderById(int orderId) async {
     try {
-      final res = await _api.get('${ApiConfig.orders}/$orderId');
-      final order = Map<String, dynamic>.from(res.data);
+      final order = await _repo.getOrderById(orderId, forceRefresh: true);
+      if (order == null) return;
       final tableId = Formatters.toNum(order['table_id']).toInt();
       if (state.selectedTableId == tableId) {
         state = state.copyWith(currentOrder: order, selectedTableId: tableId);
@@ -280,26 +269,23 @@ class OrderNotifier extends StateNotifier<OrderState> {
       final current = state.currentOrder;
       final orderBelongsToTable = current != null &&
           Formatters.toNum(current['table_id']).toInt() == tableId;
-      final res = orderBelongsToTable
-          ? await _api.put(
-              '${ApiConfig.orders}/${current['id']}',
-              data: {
+
+      final order = orderBelongsToTable
+          ? await _repo.updateOrder(
+              current['id'],
+              {
                 'items': payloadItems,
                 if (notes != null) 'notes': notes,
                 if (customerId != null) 'customer_id': customerId,
               },
             )
-          : await _api.post(
-              ApiConfig.orders,
-              data: {
-                'table_id': tableId,
-                'customer_id': customerId,
-                'notes': notes,
-                'items': payloadItems,
-              },
-            );
+          : await _repo.createOrder({
+              'table_id': tableId,
+              'customer_id': customerId,
+              'notes': notes,
+              'items': payloadItems,
+            });
 
-      final order = Map<String, dynamic>.from(res.data);
       state = state.copyWith(
         isLoading: false,
         currentOrder: order,
@@ -314,7 +300,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
 
   Future<void> updateStatus(int orderId, String status, {String? statusFilter, String? date}) async {
     try {
-      await _api.put('${ApiConfig.orders}/$orderId/status', data: {'status': status});
+      await _repo.updateStatus(orderId, status);
       await loadActiveOrders();
       await loadOrders(status: statusFilter, date: date);
     } catch (e) {
@@ -324,9 +310,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
 
   Future<void> payItems(int orderId, List<int> itemIds, {String? statusFilter, String? date}) async {
     try {
-      await _api.put('${ApiConfig.orders}/$orderId/pay-items', data: {
-        'item_ids': itemIds,
-      });
+      await _repo.payItems(orderId, itemIds);
       await loadActiveOrders();
       await loadOrders(status: statusFilter, date: date);
     } catch (e) {
@@ -355,5 +339,5 @@ class OrderNotifier extends StateNotifier<OrderState> {
 }
 
 final orderProvider = StateNotifierProvider<OrderNotifier, OrderState>((ref) {
-  return OrderNotifier(ref.watch(apiClientProvider));
+  return OrderNotifier(ref.watch(orderRepositoryProvider));
 });

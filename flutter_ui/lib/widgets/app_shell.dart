@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
+import '../core/network/connectivity_service.dart';
 import '../providers/auth_provider.dart';
 
 /// Các chế độ hiển thị sidebar.
@@ -28,32 +29,61 @@ class AppShell extends ConsumerWidget {
       SidebarMode.hidden => 0.0,
     };
 
-    return Stack(
+    final isOnline = ref.watch(isOnlineProvider);
+
+    return Column(
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (mode != SidebarMode.hidden) _Sidebar(width: sidebarWidth, mode: mode),
-            Expanded(child: child),
-          ],
-        ),
-        if (mode == SidebarMode.hidden)
-          Positioned(
-            top: 16,
-            left: 16,
-            child: Material(
-              elevation: 4,
-              shape: const CircleBorder(),
-              color: Theme.of(context).colorScheme.primary,
-              child: IconButton(
-                icon: const Icon(Icons.menu, color: Colors.white),
-                tooltip: 'Mở sidebar',
-                onPressed: () {
-                  ref.read(sidebarModeProvider.notifier).state = SidebarMode.expanded;
-                },
+        if (!isOnline)
+          Material(
+            color: Colors.orange.shade800,
+            child: const SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cloud_off, color: Colors.white, size: 16),
+                    SizedBox(width: 8),
+                    Text(
+                      'Đang offline — dữ liệu hiển thị từ bộ nhớ cục bộ',
+                      style: TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
+        Expanded(
+          child: Stack(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (mode != SidebarMode.hidden) _Sidebar(width: sidebarWidth, mode: mode),
+                  Expanded(child: child),
+                ],
+              ),
+              if (mode == SidebarMode.hidden)
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  child: Material(
+                    elevation: 4,
+                    shape: const CircleBorder(),
+                    color: Theme.of(context).colorScheme.primary,
+                    child: IconButton(
+                      icon: const Icon(Icons.menu, color: Colors.white),
+                      tooltip: 'Mở sidebar',
+                      onPressed: () {
+                        ref.read(sidebarModeProvider.notifier).state = SidebarMode.expanded;
+                      },
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }

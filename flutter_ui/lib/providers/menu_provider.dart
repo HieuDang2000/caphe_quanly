@@ -1,7 +1,5 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/network/api_client.dart';
-import '../config/api_config.dart';
+import '../repositories/menu_repository.dart';
 
 class MenuState {
   final List<Map<String, dynamic>> categories;
@@ -38,14 +36,19 @@ class MenuState {
 }
 
 class MenuNotifier extends StateNotifier<MenuState> {
-  final ApiClient _api;
-  MenuNotifier(this._api) : super(const MenuState());
+  final MenuRepository _repo;
+  MenuNotifier(this._repo) : super(const MenuState());
 
   Future<void> loadCategories() async {
     state = state.copyWith(isLoading: true);
     try {
-      final res = await _api.get(ApiConfig.categories);
-      state = state.copyWith(categories: List<Map<String, dynamic>>.from(res.data), isLoading: false);
+      final data = await _repo.getCategories();
+      state = state.copyWith(categories: data, isLoading: false);
+      // Background refresh: repo already fires async API call; when we
+      // force-refresh we pick up the latest data.
+      _repo.getCategories(forceRefresh: true).then((fresh) {
+        if (mounted) state = state.copyWith(categories: fresh);
+      }).catchError((_) {});
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -54,9 +57,11 @@ class MenuNotifier extends StateNotifier<MenuState> {
   Future<void> loadItems({int? categoryId}) async {
     state = state.copyWith(isLoading: true, selectedCategoryId: categoryId);
     try {
-      final params = categoryId != null ? {'category_id': categoryId.toString()} : null;
-      final res = await _api.get(ApiConfig.menuItems, queryParameters: params != null ? Map<String, dynamic>.from(params) : null);
-      state = state.copyWith(items: List<Map<String, dynamic>>.from(res.data), isLoading: false);
+      final data = await _repo.getItems(categoryId: categoryId);
+      state = state.copyWith(items: data, isLoading: false);
+      _repo.getItems(categoryId: categoryId).then((fresh) {
+        if (mounted) state = state.copyWith(items: fresh);
+      }).catchError((_) {});
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -64,11 +69,7 @@ class MenuNotifier extends StateNotifier<MenuState> {
 
   Future<bool> saveItem(Map<String, dynamic> data, {int? id}) async {
     try {
-      if (id != null) {
-        await _api.put('${ApiConfig.menuItems}/$id', data: data);
-      } else {
-        await _api.post(ApiConfig.menuItems, data: data);
-      }
+      await _repo.saveItem(data, id: id);
       await loadItems(categoryId: state.selectedCategoryId);
       return true;
     } catch (e) {
@@ -79,7 +80,7 @@ class MenuNotifier extends StateNotifier<MenuState> {
 
   Future<bool> deleteItem(int id) async {
     try {
-      await _api.delete('${ApiConfig.menuItems}/$id');
+      await _repo.deleteItem(id);
       state = state.copyWith(items: state.items.where((i) => i['id'] != id).toList());
       return true;
     } catch (e) {
@@ -90,10 +91,7 @@ class MenuNotifier extends StateNotifier<MenuState> {
 
   Future<bool> uploadImage(int itemId, String filePath) async {
     try {
-      final formData = FormData.fromMap({
-        'image': await MultipartFile.fromFile(filePath),
-      });
-      await _api.upload('${ApiConfig.menuItems}/$itemId/image', formData);
+      await _repo.uploadImage(itemId, filePath);
       await loadItems(categoryId: state.selectedCategoryId);
       return true;
     } catch (e) {
@@ -104,11 +102,7 @@ class MenuNotifier extends StateNotifier<MenuState> {
 
   Future<bool> saveCategory(Map<String, dynamic> data, {int? id}) async {
     try {
-      if (id != null) {
-        await _api.put('${ApiConfig.categories}/$id', data: data);
-      } else {
-        await _api.post(ApiConfig.categories, data: data);
-      }
+      await _repo.saveCategory(data, id: id);
       await loadCategories();
       return true;
     } catch (e) {
@@ -119,7 +113,7 @@ class MenuNotifier extends StateNotifier<MenuState> {
 
   Future<bool> deleteCategory(int id) async {
     try {
-      await _api.delete('${ApiConfig.categories}/$id');
+      await _repo.deleteCategory(id);
       await loadCategories();
       return true;
     } catch (e) {
@@ -130,5 +124,5 @@ class MenuNotifier extends StateNotifier<MenuState> {
 }
 
 final menuProvider = StateNotifierProvider<MenuNotifier, MenuState>((ref) {
-  return MenuNotifier(ref.watch(apiClientProvider));
+  return MenuNotifier(ref.watch(menuRepositoryProvider));
 });

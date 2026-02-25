@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/network/api_client.dart';
-import '../config/api_config.dart';
+import '../repositories/invoice_repository.dart';
 
 class InvoiceState {
   final Map<String, dynamic>? invoice;
@@ -15,14 +14,13 @@ class InvoiceState {
 }
 
 class InvoiceNotifier extends StateNotifier<InvoiceState> {
-  final ApiClient _api;
-  InvoiceNotifier(this._api) : super(const InvoiceState());
+  final InvoiceRepository _repo;
+  InvoiceNotifier(this._repo) : super(const InvoiceState());
 
   Future<Map<String, dynamic>?> generateInvoice(int orderId) async {
     state = state.copyWith(isLoading: true);
     try {
-      final res = await _api.post('${ApiConfig.invoices}/generate/$orderId');
-      final invoice = Map<String, dynamic>.from(res.data);
+      final invoice = await _repo.generateInvoice(orderId);
       state = InvoiceState(invoice: invoice);
       return invoice;
     } catch (e) {
@@ -34,8 +32,7 @@ class InvoiceNotifier extends StateNotifier<InvoiceState> {
   Future<Map<String, dynamic>?> loadInvoice(int id) async {
     state = state.copyWith(isLoading: true);
     try {
-      final res = await _api.get('${ApiConfig.invoices}/$id');
-      final invoice = Map<String, dynamic>.from(res.data);
+      final invoice = await _repo.getInvoice(id, forceRefresh: true);
       state = InvoiceState(invoice: invoice);
       return invoice;
     } catch (e) {
@@ -46,13 +43,11 @@ class InvoiceNotifier extends StateNotifier<InvoiceState> {
 
   Future<bool> addPayment(int invoiceId, {required double amount, required String method, String? reference}) async {
     try {
-      final res = await _api.post('${ApiConfig.invoices}/$invoiceId/payment', data: {
-        'amount': amount,
-        'payment_method': method,
-        'reference_number': reference,
-      });
-      final data = Map<String, dynamic>.from(res.data);
-      state = state.copyWith(invoice: Map<String, dynamic>.from(data['invoice']));
+      final invoice = await _repo.addPayment(invoiceId,
+          amount: amount, method: method, reference: reference);
+      if (invoice != null) {
+        state = state.copyWith(invoice: invoice);
+      }
       return true;
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -61,18 +56,10 @@ class InvoiceNotifier extends StateNotifier<InvoiceState> {
   }
 
   Future<List<int>> downloadInvoicePdf(int invoiceId, {bool receipt80mm = false}) async {
-    final path = receipt80mm ? '${ApiConfig.invoices}/$invoiceId/receipt' : '${ApiConfig.invoices}/$invoiceId/pdf';
-    final res = await _api.get(path, queryParameters: null);
-    // Dio mặc định trả về bytes cho PDF, đảm bảo cast đúng
-    final data = res.data;
-    if (data is List<int>) return data;
-    if (data is List) {
-      return data.cast<int>();
-    }
-    throw Exception('Không thể tải PDF hóa đơn');
+    return _repo.downloadPdf(invoiceId, receipt80mm: receipt80mm);
   }
 }
 
 final invoiceProvider = StateNotifierProvider<InvoiceNotifier, InvoiceState>((ref) {
-  return InvoiceNotifier(ref.watch(apiClientProvider));
+  return InvoiceNotifier(ref.watch(invoiceRepositoryProvider));
 });
