@@ -162,19 +162,55 @@ class ReceiptPrinter {
                 ],
               ),
               pw.SizedBox(height: 12),
-              pw.Align(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  children: [
-                    _summaryRow('Tạm tính', _formatCurrency(invoice['subtotal']), base),
-                    if (_toNum(invoice['discount_amount']) > 0)
-                      _summaryRow('Giảm giá', '-${_formatCurrency(invoice['discount_amount'])}', base),
-                    pw.Divider(),
-                    _summaryRow('Tổng cộng', _formatCurrency(invoice['total']), bold.copyWith(fontSize: 14)),
-                  ],
-                ),
-              ),
+              () {
+                // Tính lại tổng dựa trên các item chưa is_paid
+                final allSubtotal = items.fold<double>(
+                  0,
+                  (sum, item) => sum + _toNum(item['subtotal']),
+                );
+                final unpaidItems =
+                    items.where((item) => item['is_paid'] != true);
+                final unpaidSubtotal = unpaidItems.fold<double>(
+                  0,
+                  (sum, item) => sum + _toNum(item['subtotal']),
+                );
+                final rawDiscount = _toNum(invoice['discount_amount']);
+                double effectiveDiscount = 0;
+                if (allSubtotal > 0 &&
+                    rawDiscount > 0 &&
+                    unpaidSubtotal > 0) {
+                  effectiveDiscount =
+                      rawDiscount * (unpaidSubtotal / allSubtotal);
+                }
+                final displaySubtotal = unpaidSubtotal;
+                final displayTotal = displaySubtotal - effectiveDiscount;
+
+                return pw.Align(
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      _summaryRow(
+                        'Tạm tính',
+                        _formatCurrency(displaySubtotal),
+                        base,
+                      ),
+                      if (effectiveDiscount > 0)
+                        _summaryRow(
+                          'Giảm giá',
+                          '-${_formatCurrency(effectiveDiscount)}',
+                          base,
+                        ),
+                      pw.Divider(),
+                      _summaryRow(
+                        'Tổng cộng',
+                        _formatCurrency(displayTotal),
+                        bold.copyWith(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                );
+              }(),
               pw.SizedBox(height: 30),
               pw.Center(
                 child: pw.Text('Cảm ơn quý khách! Hẹn gặp lại!', style: base),
@@ -316,25 +352,52 @@ class ReceiptPrinter {
                 ],
               ),
               pw.Divider(),
-              pw.Align(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  children: [
-                    pw.Text('Tạm tính: ${_formatCurrency(invoice['subtotal'])}', style: baseStyle.copyWith(fontSize: 8)),
-                    if ((invoice['discount_amount'] ?? 0) != 0)
+              () {
+                // Tính lại tổng dựa trên các item chưa is_paid
+                final allSubtotal = items.fold<double>(
+                  0,
+                  (sum, item) => sum + _toNum(item['subtotal']),
+                );
+                final unpaidItems =
+                    items.where((item) => item['is_paid'] != true);
+                final unpaidSubtotal = unpaidItems.fold<double>(
+                  0,
+                  (sum, item) => sum + _toNum(item['subtotal']),
+                );
+                final rawDiscount = _toNum(invoice['discount_amount']);
+                double effectiveDiscount = 0;
+                if (allSubtotal > 0 &&
+                    rawDiscount > 0 &&
+                    unpaidSubtotal > 0) {
+                  effectiveDiscount =
+                      rawDiscount * (unpaidSubtotal / allSubtotal);
+                }
+                final displaySubtotal = unpaidSubtotal;
+                final displayTotal = displaySubtotal - effectiveDiscount;
+
+                return pw.Align(
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
                       pw.Text(
-                        'Giảm giá: -${_formatCurrency(invoice['discount_amount'])}',
+                        'Tạm tính: ${_formatCurrency(displaySubtotal)}',
                         style: baseStyle.copyWith(fontSize: 8),
                       ),
-                    pw.SizedBox(height: 2),
-                    pw.Text(
-                      'Tổng cộng: ${_formatCurrency(invoice['total'])}',
-                      style: boldStyle.copyWith(fontSize: 9),
-                    ),
-                  ],
-                ),
-              ),
+                      if (effectiveDiscount > 0)
+                        pw.Text(
+                          'Giảm giá: -${_formatCurrency(effectiveDiscount)}',
+                          style: baseStyle.copyWith(fontSize: 8),
+                        ),
+                      pw.SizedBox(height: 2),
+                      pw.Text(
+                        'Tổng cộng: ${_formatCurrency(displayTotal)}',
+                        style: boldStyle.copyWith(fontSize: 9),
+                      ),
+                    ],
+                  ),
+                );
+              }(),
               pw.Divider(),
               pw.Center(
                 child: pw.Column(

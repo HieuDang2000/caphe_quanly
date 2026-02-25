@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/order_provider.dart';
-import '../../providers/invoice_provider.dart';
 import '../../services/receipt_printer.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/responsive_layout.dart';
@@ -301,15 +300,27 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                         final orderId = order['id'] as int?;
                                         if (orderId == null) return;
 
-                                        // Nếu đã có invoice gắn với order thì load lại, nếu chưa thì generate mới
-                                        Map<String, dynamic>? invoice;
-                                        final existingInvId = order['invoice']?['id'] as int?;
-                                        if (existingInvId != null) {
-                                          invoice = await ref.read(invoiceProvider.notifier).loadInvoice(existingInvId);
-                                        } else {
-                                          invoice = await ref.read(invoiceProvider.notifier).generateInvoice(orderId);
-                                        }
-                                        if (!mounted || invoice == null) return;
+                                        // In toàn bộ bill dựa trên dữ liệu order hiện tại
+                                        final orderItems =
+                                            (order['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+                                        if (orderItems.isEmpty) return;
+
+                                        final subtotal = orderItems.fold<double>(
+                                          0,
+                                          (s, i) => s + Formatters.toNum(i['subtotal']),
+                                        );
+                                        final fullOrder = Map<String, dynamic>.from(order);
+                                        fullOrder['items'] = orderItems;
+                                        final invoice = <String, dynamic>{
+                                          'invoice_number': order['invoice']?['invoice_number'] ??
+                                              '${order['order_number'] ?? ''}',
+                                          'created_at': order['invoice']?['created_at'] ??
+                                              DateTime.now().toIso8601String(),
+                                          'subtotal': subtotal,
+                                          'total': subtotal,
+                                          'discount_amount': 0,
+                                          'order': fullOrder,
+                                        };
 
                                         await ReceiptPrinter.print80mm(invoice: invoice);
                                       },

@@ -83,9 +83,10 @@ class OrderController extends Controller
         $newStatus = $request->status;
         $order->update(['status' => $newStatus]);
 
-        if ($newStatus === 'paid') {
-            $order->items()->update(['is_paid' => true]);
-        } elseif ($newStatus === 'pending') {
+        // Chỉ reset is_paid khi đưa đơn về trạng thái pending.
+        // Khi thanh toán toàn bộ (status = paid) thì không thay đổi is_paid
+        // để vẫn phân biệt được các item đã được thanh toán theo kiểu "một phần".
+        if ($newStatus === 'pending') {
             $order->items()->update(['is_paid' => false]);
         }
 
@@ -108,6 +109,9 @@ class OrderController extends Controller
         $order->items()
             ->whereIn('id', $request->input('item_ids', []))
             ->update(['is_paid' => true]);
+        
+        $order->total -= $order->items()->whereIn('id', $request->input('item_ids', []))->sum('subtotal');
+        $order->save();
 
         $order->refresh()->load(['items.menuItem', 'table', 'user']);
 

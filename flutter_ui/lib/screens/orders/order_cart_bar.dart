@@ -489,26 +489,47 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                         onPressed: () async {
                           final currentOrder = ref.read(orderProvider).currentOrder;
                           if (currentOrder == null) return;
+
+                          // Không chọn item nào => in toàn bộ item trong order.
                           if (_selectedItemIdsForInvoice.isEmpty) {
-                            Map<String, dynamic>? invoice;
-                            final existingInvId = currentOrder['invoice']?['id'] as int?;
-                            if (existingInvId != null) {
-                              invoice = await ref.read(invoiceProvider.notifier).loadInvoice(existingInvId);
-                            } else {
-                              invoice = await ref.read(invoiceProvider.notifier).generateInvoice(orderId);
-                            }
-                            if (!mounted || invoice == null) return;
+                            final orderItems =
+                                (currentOrder['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+                            if (orderItems.isEmpty) return;
+                            final subtotal = orderItems.fold<double>(
+                              0,
+                              (s, i) => s + Formatters.toNum(i['subtotal']),
+                            );
+                            final fullOrder = Map<String, dynamic>.from(currentOrder);
+                            fullOrder['items'] = orderItems;
+                            final invoice = <String, dynamic>{
+                              'invoice_number': currentOrder['invoice']?['invoice_number'] ??
+                                  '${currentOrder['order_number'] ?? ''}',
+                              'created_at': currentOrder['invoice']?['created_at'] ??
+                                  DateTime.now().toIso8601String(),
+                              'subtotal': subtotal,
+                              'total': subtotal,
+                              'discount_amount': 0,
+                              'order': fullOrder,
+                            };
                             await ReceiptPrinter.print80mm(invoice: invoice);
                           } else {
-                            final orderItems = (currentOrder['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-                            final selectedItems = orderItems.where((i) => _selectedItemIdsForInvoice.contains(i['id'])).toList();
+                            final orderItems =
+                                (currentOrder['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+                            final selectedItems = orderItems
+                                .where((i) => _selectedItemIdsForInvoice.contains(i['id']))
+                                .toList();
                             if (selectedItems.isEmpty) return;
-                            final partialSubtotal = selectedItems.fold<double>(0, (s, i) => s + Formatters.toNum(i['subtotal']));
+                            final partialSubtotal = selectedItems.fold<double>(
+                              0,
+                              (s, i) => s + Formatters.toNum(i['subtotal']),
+                            );
                             final partialOrder = Map<String, dynamic>.from(currentOrder);
                             partialOrder['items'] = selectedItems;
                             final partialInvoice = <String, dynamic>{
-                              'invoice_number': currentOrder['invoice']?['invoice_number'] ?? '${currentOrder['order_number'] ?? ''}-partial',
-                              'created_at': currentOrder['invoice']?['created_at'] ?? DateTime.now().toIso8601String(),
+                              'invoice_number': currentOrder['invoice']?['invoice_number'] ??
+                                  '${currentOrder['order_number'] ?? ''}-partial',
+                              'created_at': currentOrder['invoice']?['created_at'] ??
+                                  DateTime.now().toIso8601String(),
                               'subtotal': partialSubtotal,
                               'total': partialSubtotal,
                               'discount_amount': 0,

@@ -272,6 +272,7 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                                 await ref
                                                     .read(orderProvider.notifier)
                                                     .saveTableOrderItems(tableId, newItems);
+                                                noteController.clear();
                                               },
                                             )
                                           else if (qty > 0) ...[
@@ -318,6 +319,7 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                                       quantity: 1,
                                                       options: null,
                                                     );
+                                                noteController.clear();
                                               },
                                             ),
                                         ],
