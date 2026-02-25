@@ -219,6 +219,18 @@ class OrderNotifier extends StateNotifier<OrderState> {
     }
   }
 
+  Future<void> payItems(int orderId, List<int> itemIds, {String? statusFilter, String? date}) async {
+    try {
+      await _api.put('${ApiConfig.orders}/$orderId/pay-items', data: {
+        'item_ids': itemIds,
+      });
+      await loadActiveOrders();
+      await loadOrders(status: statusFilter, date: date);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
   void startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {

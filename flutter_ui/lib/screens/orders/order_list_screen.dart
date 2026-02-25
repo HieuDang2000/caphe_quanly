@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/order_provider.dart';
@@ -24,6 +23,7 @@ class OrderListScreen extends ConsumerStatefulWidget {
 class _OrderListScreenState extends ConsumerState<OrderListScreen> {
   String? _statusFilter;
   late String _selectedDate;
+  final Map<int, Set<int>> _selectedItemsByOrder = {};
 
   @override
   void initState() {
@@ -45,14 +45,8 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     switch (status) {
       case 'pending':
         return AppTheme.warningColor;
-      case 'in_progress':
-        return Colors.blue;
-      case 'completed':
-        return AppTheme.successColor;
       case 'paid':
         return AppTheme.primaryColor;
-      case 'cancelled':
-        return AppTheme.errorColor;
       default:
         return Colors.grey;
     }
@@ -93,10 +87,8 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: null, child: Text('Tất cả')),
-              const PopupMenuItem(value: 'pending', child: Text('Chờ xử lý')),
-              const PopupMenuItem(value: 'in_progress', child: Text('Đang pha chế')),
-              const PopupMenuItem(value: 'completed', child: Text('Hoàn thành')),
-              const PopupMenuItem(value: 'cancelled', child: Text('Đã hủy')),
+              const PopupMenuItem(value: 'pending', child: Text('Đang chờ')),
+              const PopupMenuItem(value: 'paid', child: Text('Đã thanh toán')),
             ],
           ),
         ],
@@ -185,14 +177,53 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                               ...items.map((item) {
                                 final opts = item['options'] as List? ?? [];
                                 final note = item['notes'] as String?;
+                                final isItemPaid = (item['is_paid'] == true);
                                 final hasOpts = opts.isNotEmpty;
                                 final hasNote = note != null && note.trim().isNotEmpty;
                                 final optText = hasOpts
                                     ? opts.map((o) => o is Map ? '${o['name']} +${Formatters.currency(Formatters.toNum(o['extra_price']))}' : '').where((s) => s.isNotEmpty).join(' · ')
                                     : null;
-                                return ListTile(
+                                final orderId = order['id'] as int;
+                                final itemId = item['id'] as int;
+                                final canSelect = status == 'pending' && !isItemPaid;
+                                final selectedSet = _selectedItemsByOrder[orderId] ?? <int>{};
+                                final isSelected = canSelect && selectedSet.contains(itemId);
+
+                                return CheckboxListTile(
                                   dense: true,
-                                  title: Text(item['menu_item']?['name'] ?? ''),
+                                  controlAffinity: ListTileControlAffinity.leading,
+                                  value: canSelect ? isSelected : isItemPaid,
+                                  onChanged: canSelect
+                                      ? (checked) {
+                                          setState(() {
+                                            final current = _selectedItemsByOrder[orderId] ?? <int>{};
+                                            if (checked == true) {
+                                              current.add(itemId);
+                                            } else {
+                                              current.remove(itemId);
+                                            }
+                                            _selectedItemsByOrder[orderId] = current;
+                                          });
+                                        }
+                                      : null,
+                                  title: Row(
+                                    children: [
+                                      Expanded(child: Text(item['menu_item']?['name'] ?? '')),
+                                      if (isItemPaid)
+                                        Container(
+                                          margin: const EdgeInsets.only(left: 8),
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.successColor.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: Text(
+                                            'Đã TT',
+                                            style: TextStyle(fontSize: 11, color: AppTheme.successColor, fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                   subtitle: (hasOpts || hasNote)
                                       ? Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,7 +236,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                           ],
                                         )
                                       : null,
-                                  trailing: Text('x${item['quantity']} - ${Formatters.currency(item['subtotal'] ?? 0)}'),
+                                  secondary: Text('x${item['quantity']} - ${Formatters.currency(item['subtotal'] ?? 0)}'),
                                 );
                               }),
                               Padding(
@@ -213,81 +244,57 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                   children: [
-                                    if (status == 'pending')
+                                    if (status == 'pending') ...[
                                       ElevatedButton(
-                                        onPressed: () => ref.read(orderProvider.notifier).updateStatus(order['id'], 'in_progress', statusFilter: _statusFilter, date: _selectedDate),
-                                        child: const Text('Bắt đầu'),
+                                        onPressed: () => ref.read(orderProvider.notifier).updateStatus(order['id'], 'paid', statusFilter: _statusFilter, date: _selectedDate),
+                                        child: const Text('Thanh toán toàn bộ'),
                                       ),
-                                    if (status == 'in_progress')
                                       ElevatedButton(
-                                        onPressed: () => ref.read(orderProvider.notifier).updateStatus(order['id'], 'completed', statusFilter: _statusFilter, date: _selectedDate),
-                                        child: const Text('Hoàn thành'),
-                                      ),
-                                    if (status == 'pending' || status == 'in_progress')
-                                      OutlinedButton(
-                                        onPressed: () => ref.read(orderProvider.notifier).updateStatus(order['id'], 'cancelled', statusFilter: _statusFilter, date: _selectedDate),
-                                        child: const Text('Hủy', style: TextStyle(color: AppTheme.errorColor)),
-                                      ),
-                                    if (status == 'completed') ...[
-                                      OutlinedButton(
-                                        onPressed: () => ref.read(orderProvider.notifier).updateStatus(order['id'], 'in_progress', statusFilter: _statusFilter, date: _selectedDate),
-                                        child: const Text('Về đang pha chế'),
-                                      ),
-                                      ElevatedButton.icon(
                                         onPressed: () async {
-                                          final invoice = await ref.read(invoiceProvider.notifier).generateInvoice(order['id'] as int);
-                                          if (!mounted || invoice == null) return;
-                                          context.push('/payment/${invoice['id']}');
+                                          final orderId = order['id'] as int?;
+                                          if (orderId == null) return;
+                                          final selected = _selectedItemsByOrder[orderId] ?? <int>{};
+                                          if (selected.isEmpty) return;
+                                          await ref.read(orderProvider.notifier).payItems(orderId, selected.toList(), statusFilter: _statusFilter, date: _selectedDate);
+                                          if (!mounted) return;
+                                          setState(() {
+                                            _selectedItemsByOrder[orderId] = <int>{};
+                                          });
                                         },
-                                        icon: const Icon(Icons.payment),
-                                        label: const Text('Thanh toán'),
+                                        child: const Text('Thanh toán đã chọn'),
                                       ),
                                     ],
-                                    if (status == 'paid' && order['invoice'] != null) ...[
-                                      ElevatedButton.icon(
+                                    if (status == 'paid')
+                                      OutlinedButton(
                                         onPressed: () async {
-                                          final invId = order['invoice']['id'] as int?;
-                                          if (invId == null) return;
-                                          final invoice = await ref.read(invoiceProvider.notifier).loadInvoice(invId);
-                                          if (!mounted || invoice == null) return;
-                                          final saved = await ReceiptPrinter.saveA4ToFile(invoice: invoice);
-                                          if (mounted && saved) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Đã lưu hoá đơn A4')),
-                                            );
-                                          }
+                                          await ref.read(orderProvider.notifier).updateStatus(order['id'], 'pending', statusFilter: _statusFilter, date: _selectedDate);
+                                          if (!mounted) return;
+                                          setState(() {
+                                            _selectedItemsByOrder.remove(order['id']);
+                                          });
                                         },
-                                        icon: const Icon(Icons.picture_as_pdf),
-                                        label: const Text('Tải PDF A4'),
+                                        child: const Text('Về chờ xử lý'),
                                       ),
-                                      // ElevatedButton.icon(
-                                      //   onPressed: () async {
-                                      //     final invId = order['invoice']['id'] as int?;
-                                      //     if (invId == null) return;
-                                      //     final invoice = await ref.read(invoiceProvider.notifier).loadInvoice(invId);
-                                      //     if (!mounted || invoice == null) return;
-                                      //     final saved = await ReceiptPrinter.save80mmToFile(invoice: invoice);
-                                      //     if (mounted && saved) {
-                                      //       ScaffoldMessenger.of(context).showSnackBar(
-                                      //         const SnackBar(content: Text('Đã lưu hoá đơn 80mm')),
-                                      //       );
-                                      //     }
-                                      //   },
-                                      //   icon: const Icon(Icons.receipt_long),
-                                      //   label: const Text('Tải 80mm'),
-                                      // ),
-                                      OutlinedButton.icon(
-                                        onPressed: () async {
-                                          final invId = order['invoice']['id'] as int?;
-                                          if (invId == null) return;
-                                          final invoice = await ref.read(invoiceProvider.notifier).loadInvoice(invId);
-                                          if (!mounted || invoice == null) return;
-                                          await ReceiptPrinter.print80mm(invoice: invoice);
-                                        },
-                                        icon: const Icon(Icons.print),
-                                        label: const Text('In hóa đơn'),
-                                      ),
-                                    ],
+                                    ElevatedButton.icon(
+                                      onPressed: () async {
+                                        final orderId = order['id'] as int?;
+                                        if (orderId == null) return;
+
+                                        // Nếu đã có invoice gắn với order thì load lại, nếu chưa thì generate mới
+                                        Map<String, dynamic>? invoice;
+                                        final existingInvId = order['invoice']?['id'] as int?;
+                                        if (existingInvId != null) {
+                                          invoice = await ref.read(invoiceProvider.notifier).loadInvoice(existingInvId);
+                                        } else {
+                                          invoice = await ref.read(invoiceProvider.notifier).generateInvoice(orderId);
+                                        }
+                                        if (!mounted || invoice == null) return;
+
+                                        await ReceiptPrinter.print80mm(invoice: invoice);
+                                      },
+                                      icon: const Icon(Icons.print),
+                                      label: const Text('In hóa đơn'),
+                                    ),
                                   ],
                                 ),
                               ),

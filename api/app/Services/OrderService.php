@@ -43,7 +43,7 @@ class OrderService
     public function findActiveOrderForTable(int $tableId): ?Order
     {
         return Order::where('table_id', $tableId)
-            ->whereIn('status', ['pending', 'in_progress'])
+            ->where('status', 'pending')
             ->orderByDesc('created_at')
             ->first();
     }

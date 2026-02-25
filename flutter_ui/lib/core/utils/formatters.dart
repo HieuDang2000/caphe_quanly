@@ -24,13 +24,7 @@ class Formatters {
   static String orderStatus(String status) {
     switch (status) {
       case 'pending':
-        return 'Chờ xử lý';
-      case 'in_progress':
-        return 'Đang pha chế';
-      case 'completed':
-        return 'Hoàn thành';
-      case 'cancelled':
-        return 'Đã hủy';
+        return 'Đang chờ';
       case 'paid':
         return 'Đã thanh toán';
       default:

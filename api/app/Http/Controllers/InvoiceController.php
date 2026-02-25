@@ -18,10 +18,6 @@ class InvoiceController extends Controller
     {
         $order = Order::with('items')->findOrFail($orderId);
 
-        if ($order->status !== 'completed') {
-            return response()->json(['message' => 'Chỉ tạo hóa đơn cho đơn hoàn thành'], 400);
-        }
-
         $invoice = $this->invoiceService->generate($order);
 
         return response()->json($invoice, 201);

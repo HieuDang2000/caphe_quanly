@@ -52,9 +52,6 @@ class OrderController extends Controller
         if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
 
         $order = $this->orderService->createOrder($request->all(), auth('api')->id());
-        //update order status
-        $order->update(['status' => 'in_progress']);
-
         return response()->json($order, 201);
     }
 
@@ -67,8 +64,8 @@ class OrderController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $order = Order::findOrFail($id);
-        if ($order->status === 'completed' || $order->status === 'cancelled') {
-            return response()->json(['message' => 'Không thể sửa đơn hàng đã hoàn thành/hủy'], 400);
+        if ($order->status === 'paid') {
+            return response()->json(['message' => 'Không thể sửa đơn đã thanh toán'], 400);
         }
 
         $order = $this->orderService->updateOrder($order, $request->all(), auth('api')->id());
@@ -78,14 +75,45 @@ class OrderController extends Controller
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'status' => 'required|in:pending,in_progress,completed,cancelled,paid',
+            'status' => 'required|in:pending,paid',
         ]);
         if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
 
         $order = Order::findOrFail($id);
         $newStatus = $request->status;
         $order->update(['status' => $newStatus]);
+
+        if ($newStatus === 'paid') {
+            $order->items()->update(['is_paid' => true]);
+        } elseif ($newStatus === 'pending') {
+            $order->items()->update(['is_paid' => false]);
+        }
+
         $order->load(['items.menuItem', 'table', 'user']);
+
+        return response()->json($order);
+    }
+
+    public function payItems(Request $request, int $id): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'item_ids' => 'required|array|min:1',
+            'item_ids.*' => 'required|integer|exists:order_items,id',
+        ]);
+        if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
+
+        $order = Order::with('items')->findOrFail($id);
+
+        // Chỉ cập nhật các item thuộc đơn này
+        $order->items()
+            ->whereIn('id', $request->input('item_ids', []))
+            ->update(['is_paid' => true]);
+
+        $order->refresh()->load(['items.menuItem', 'table', 'user']);
+
+        if ($order->items->every(fn ($item) => $item->is_paid)) {
+            $order->update(['status' => 'paid']);
+        }
 
         return response()->json($order);
     }
@@ -94,7 +122,7 @@ class OrderController extends Controller
     {
         $orders = Order::with(['items.menuItem', 'user'])
             ->where('table_id', $tableId)
-            ->whereIn('status', ['pending', 'in_progress'])
+            ->where('status', 'pending')
             ->orderByDesc('created_at')
             ->get();
 
@@ -104,7 +132,7 @@ class OrderController extends Controller
     public function active(): JsonResponse
     {
         $orders = Order::with(['items.menuItem', 'table', 'user'])
-            ->whereIn('status', ['pending', 'in_progress'])
+            ->where('status', 'pending')
             ->orderByDesc('created_at')
             ->get();
 

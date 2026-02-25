@@ -74,6 +74,7 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/{id}', [OrderController::class, 'show']);
         Route::put('/{id}', [OrderController::class, 'update']);
         Route::put('/{id}/status', [OrderController::class, 'updateStatus']);
+        Route::put('/{id}/pay-items', [OrderController::class, 'payItems']);
     });
 
     // Invoices
