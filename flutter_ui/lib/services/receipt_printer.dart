@@ -82,7 +82,15 @@ class ReceiptPrinter {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Center(
-                child: pw.Text('COFFEE SHOP', style: bold.copyWith(fontSize: 22)),
+                child: pw.Column(
+                  mainAxisSize: pw.MainAxisSize.min,
+                  children: [
+                    pw.Text('HIÊN', style: bold.copyWith(fontSize: 22)),
+                    pw.SizedBox(height: 2),
+                    pw.Text('Ngọc Thạnh 2, Phước An, Gia Lai', style: base),
+                    pw.Text('ĐT: 034-226-3291', style: base),
+                  ],
+                ),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
@@ -228,28 +236,30 @@ class ReceiptPrinter {
 
     doc.addPage(
       pw.Page(
-        pageFormat: const PdfPageFormat(226.0, double.infinity, marginAll: 5),
+        pageFormat: const PdfPageFormat(130.0, double.infinity, marginAll: 5),
         build: (context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Center(
-                child: pw.Text(
-                  'COFFEE SHOP',
-                  style: boldStyle.copyWith(fontSize: 16),
+                child: pw.Column(
+                  mainAxisSize: pw.MainAxisSize.min,
+                  children: [
+                    pw.Text('HIÊN', style: boldStyle.copyWith(fontSize: 13)),
+                    pw.SizedBox(height: 2),
+                    pw.Text('Ngọc Thạnh 2, Phước An, Gia Lai', style: baseStyle.copyWith(fontSize: 7)),
+                    pw.Text('ĐT: 034-226-3291', style: baseStyle.copyWith(fontSize: 7)),
+                  ],
                 ),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text('HÓA ĐƠN THANH TOÁN', style: baseStyle),
+                child: pw.Text('HÓA ĐƠN THANH TOÁN', style: baseStyle.copyWith(fontSize: 8)),
               ),
               pw.SizedBox(height: 6),
-              pw.Text('HĐ: ${invoice['invoice_number'] ?? ''}', style: baseStyle),
-              pw.Text('ĐH: ${order['order_number'] ?? ''}', style: baseStyle),
+              pw.Text('ĐH: ${order['order_number'] ?? ''}', style: baseStyle.copyWith(fontSize: 6)),
               if (order['table'] != null)
-                pw.Text('Bàn: ${order['table']['name']}', style: baseStyle),
-              if (order['user'] != null)
-                pw.Text('NV: ${order['user']['name']}', style: baseStyle),
+                pw.Text('Bàn: ${order['table']['name']}', style: baseStyle.copyWith(fontSize: 6)),
               pw.Divider(),
               pw.Table(
                 columnWidths: {
@@ -260,14 +270,14 @@ class ReceiptPrinter {
                 children: [
                   pw.TableRow(
                     children: [
-                      pw.Text('Món', style: boldStyle.copyWith(fontSize: 9)),
+                      pw.Text('Món', style: boldStyle.copyWith(fontSize: 5)),
                       pw.Align(
                         alignment: pw.Alignment.center,
-                        child: pw.Text('SL', style: boldStyle.copyWith(fontSize: 9)),
+                        child: pw.Text('SL', style: boldStyle.copyWith(fontSize: 6)),
                       ),
                       pw.Align(
                         alignment: pw.Alignment.centerRight,
-                        child: pw.Text('Tiền', style: boldStyle.copyWith(fontSize: 9)),
+                        child: pw.Text('Tiền', style: boldStyle.copyWith(fontSize: 6)),
                       ),
                     ],
                   ),
@@ -276,19 +286,20 @@ class ReceiptPrinter {
                       children: [
                         pw.Text(
                           item['menu_item']?['name']?.toString() ?? '',
-                          style: baseStyle.copyWith(fontSize: 9),
+                          style: baseStyle.copyWith(fontSize: 7),
                         ),
                         pw.Align(
                           alignment: pw.Alignment.center,
-                          child: pw.Text('${item['quantity']}', style: baseStyle.copyWith(fontSize: 9)),
+                          child: pw.Text('${item['quantity']}', style: baseStyle.copyWith(fontSize: 7)),
                         ),
                         pw.Align(
                           alignment: pw.Alignment.centerRight,
                           child: pw.Text(
                             _formatCurrency(item['subtotal']),
-                            style: baseStyle.copyWith(fontSize: 9),
+                            style: baseStyle.copyWith(fontSize: 7),
                           ),
                         ),
+                        pw.Divider(thickness: 0.5, height: 0.5),
                       ],
                     ),
                   ),
@@ -300,26 +311,37 @@ class ReceiptPrinter {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
-                    pw.Text('Tạm tính: ${_formatCurrency(invoice['subtotal'])}', style: baseStyle),
+                    pw.Text('Tạm tính: ${_formatCurrency(invoice['subtotal'])}', style: baseStyle.copyWith(fontSize: 8)),
                     if ((invoice['discount_amount'] ?? 0) != 0)
                       pw.Text(
                         'Giảm giá: -${_formatCurrency(invoice['discount_amount'])}',
-                        style: baseStyle,
+                        style: baseStyle.copyWith(fontSize: 8),
                       ),
                     pw.SizedBox(height: 2),
                     pw.Text(
                       'Tổng cộng: ${_formatCurrency(invoice['total'])}',
-                      style: boldStyle.copyWith(fontSize: 12),
+                      style: boldStyle.copyWith(fontSize: 9),
                     ),
                   ],
                 ),
               ),
               pw.Divider(),
               pw.Center(
-                child: pw.Text(
-                  'Cảm ơn quý khách! Hẹn gặp lại!',
-                  style: baseStyle.copyWith(fontSize: 9),
-                  textAlign: pw.TextAlign.center,
+                child: pw.Column(
+                  mainAxisSize: pw.MainAxisSize.min,
+                  children: [
+                    pw.Text(
+                      'Trà sữa Hiên',
+                      style: boldStyle.copyWith(fontSize: 8),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      'Cảm ơn quý khách! Hẹn gặp lại!',
+                      style: baseStyle.copyWith(fontSize: 7),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  ],
                 ),
               ),
             ],
