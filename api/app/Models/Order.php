@@ -51,7 +51,10 @@ class Order extends Model
 
     public function recalculate(): void
     {
-        $subtotal = $this->items()->sum('subtotal');
+        // Chỉ tính lại trên các item chưa được thanh toán (is_paid = false)
+        $subtotal = $this->items()
+            ->where('is_paid', false)
+            ->sum('subtotal');
         $tax = 0;
         $total = $subtotal - $this->discount;
         $this->update(compact('subtotal', 'tax', 'total'));

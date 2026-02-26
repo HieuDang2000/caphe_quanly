@@ -75,7 +75,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'status' => 'required|in:pending,paid',
+            'status' => 'required|in:pending,paid,cancelled',
         ]);
         if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
 
@@ -88,6 +88,13 @@ class OrderController extends Controller
         // để vẫn phân biệt được các item đã được thanh toán theo kiểu "một phần".
         if ($newStatus === 'pending') {
             $order->items()->update(['is_paid' => false]);
+        }
+
+        // Khi hủy đơn, đảm bảo các item được đánh dấu là chưa thanh toán
+        // và tổng tiền được tính lại để phản ánh trạng thái hủy.
+        if ($newStatus === 'cancelled') {
+            $order->items()->update(['is_paid' => false]);
+            $order->recalculate();
         }
 
         $order->load(['items.menuItem', 'table', 'user']);
@@ -157,5 +164,61 @@ class OrderController extends Controller
              ->get();
 
          return response()->json($tables);
+    }
+
+    /**
+     * Hủy (cancel) toàn bộ đơn pending của một bàn và giải phóng bàn,
+     * nhưng KHÔNG xóa object bàn trong layout.
+     */
+    public function clearTableOrders(int $tableId): JsonResponse
+    {
+        $orders = Order::with('items')
+            ->where('table_id', $tableId)
+            ->where('status', 'pending')
+            ->get();
+
+        foreach ($orders as $order) {
+            $order->update([
+                'status' => 'cancelled',
+                'table_id' => null,
+            ]);
+            // Đảm bảo các item được đánh dấu chưa thanh toán và tổng tiền được tính lại
+            $order->items()->update(['is_paid' => false]);
+            $order->recalculate();
+        }
+
+        return response()->json(['message' => 'Đã xóa toàn bộ đơn của bàn']);
+    }
+
+    public function mergeTables(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'source_table_id' => 'required|integer|different:target_table_id|exists:layout_objects,id',
+            'target_table_id' => 'required|integer|exists:layout_objects,id',
+        ]);
+
+        $this->orderService->mergeTables(
+            (int) $data['source_table_id'],
+            (int) $data['target_table_id'],
+        );
+
+        return response()->json(['message' => 'Gộp bàn thành công']);
+    }
+
+    public function moveTable(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'source_table_id' => 'required|integer|different:target_table_id|exists:layout_objects,id',
+            'target_table_id' => 'required|integer|exists:layout_objects,id',
+            'order_id' => 'nullable|integer|exists:orders,id',
+        ]);
+
+        $this->orderService->moveTable(
+            (int) $data['source_table_id'],
+            (int) $data['target_table_id'],
+            isset($data['order_id']) ? (int) $data['order_id'] : null,
+        );
+
+        return response()->json(['message' => 'Chuyển bàn thành công']);
     }
 }

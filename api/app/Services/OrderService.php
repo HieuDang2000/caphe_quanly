@@ -72,12 +72,105 @@ class OrderService
         return $order;
     }
 
+    /**
+     * Gộp toàn bộ các đơn pending của bàn nguồn vào bàn đích ở mức order.
+     *
+     * Quy ước:
+     * - Nếu bàn đích chưa có đơn pending: chỉ cần chuyển table_id các đơn pending từ source sang target.
+     * - Nếu cả hai cùng có đơn pending:
+     *   - Gộp toàn bộ item của các đơn source sang đơn mới nhất của bàn đích.
+     *   - Các đơn source sau khi gộp sẽ được đánh dấu cancelled và bỏ liên kết bàn.
+     */
+    public function mergeTables(int $sourceTableId, int $targetTableId): void
+    {
+        if ($sourceTableId === $targetTableId) {
+            return;
+        }
+
+        $sourceOrders = Order::with('items')
+            ->where('table_id', $sourceTableId)
+            ->where('status', 'pending')
+            ->orderBy('created_at')
+            ->get();
+
+        if ($sourceOrders->isEmpty()) {
+            return;
+        }
+
+        $targetOrder = $this->findActiveOrderForTable($targetTableId);
+
+        // Nếu bàn đích chưa có đơn pending: chỉ chuyển table_id
+        if ($targetOrder === null) {
+            foreach ($sourceOrders as $order) {
+                $order->update(['table_id' => $targetTableId]);
+            }
+            return;
+        }
+
+        // Cả hai bàn đều có pending: gộp vào đơn mới nhất của bàn đích
+        /** @var Order $targetOrder */
+        foreach ($sourceOrders as $order) {
+            if ($order->id === $targetOrder->id) {
+                continue;
+            }
+
+            foreach ($order->items as $item) {
+                // Tạo item mới trên order đích, giữ nguyên snapshot giá/options
+                OrderItem::create([
+                    'order_id' => $targetOrder->id,
+                    'menu_item_id' => $item->menu_item_id,
+                    'quantity' => $item->quantity,
+                    'unit_price' => $item->unit_price,
+                    'subtotal' => $item->subtotal,
+                    'notes' => $item->notes,
+                    'options' => $item->options,
+                ]);
+            }
+
+            // Đánh dấu đơn nguồn đã được gộp
+            $order->update([
+                'status' => 'cancelled',
+                'table_id' => null,
+            ]);
+        }
+
+        $targetOrder->recalculate();
+    }
+
+    /**
+     * Chuyển đơn giữa các bàn.
+     *
+     * - Nếu truyền orderId: chỉ move đơn đó sang bàn đích (vẫn giữ status hiện tại).
+     * - Nếu không: move toàn bộ đơn pending của bàn nguồn sang bàn đích.
+     */
+    public function moveTable(int $sourceTableId, int $targetTableId, ?int $orderId = null): void
+    {
+        if ($sourceTableId === $targetTableId) {
+            return;
+        }
+
+        if ($orderId !== null) {
+            $order = Order::where('id', $orderId)
+                ->where('table_id', $sourceTableId)
+                ->firstOrFail();
+
+            /** @var Order $order */
+            $order->update(['table_id' => $targetTableId]);
+            return;
+        }
+
+        Order::where('table_id', $sourceTableId)
+            ->where('status', 'pending')
+            ->update(['table_id' => $targetTableId]);
+    }
+
     public function updateOrder(Order $order, array $data, int $userId): Order
     {
         $order->update(collect($data)->only(['customer_id', 'table_id', 'notes', 'discount'])->toArray());
 
         if (isset($data['items'])) {
-            $order->items()->delete();
+            // Chỉ thay thế các item chưa thanh toán; giữ nguyên lịch sử các item đã is_paid = true
+            $order->items()->where('is_paid', false)->delete();
             $this->syncItems($order, $data['items']);
         }
 

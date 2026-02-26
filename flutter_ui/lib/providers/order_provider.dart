@@ -209,6 +209,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
   }
 
   Future<void> loadTableActiveOrder(int tableId) async {
+    state = state.copyWith(isLoading: true);
     try {
       final list = await _repo.getTableOrders(tableId);
       Map<String, dynamic>? order;
@@ -218,9 +219,10 @@ class OrderNotifier extends StateNotifier<OrderState> {
       state = state.copyWith(
         currentOrder: order,
         selectedTableId: tableId,
+        isLoading: false,
       );
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -248,7 +250,6 @@ class OrderNotifier extends StateNotifier<OrderState> {
     int? customerId,
   }) async {
     if (items.isEmpty) return null;
-    state = state.copyWith(isLoading: true);
     try {
       final payloadItems = items.map((i) {
         final opts = (i['options'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
@@ -287,13 +288,12 @@ class OrderNotifier extends StateNotifier<OrderState> {
             });
 
       state = state.copyWith(
-        isLoading: false,
         currentOrder: order,
         selectedTableId: tableId,
       );
       return order;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(error: e.toString());
       return null;
     }
   }
@@ -313,6 +313,45 @@ class OrderNotifier extends StateNotifier<OrderState> {
       await _repo.payItems(orderId, itemIds);
       await loadActiveOrders();
       await loadOrders(status: statusFilter, date: date);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
+  Future<void> mergeTables(int sourceTableId, int targetTableId) async {
+    try {
+      await _repo.mergeTables(sourceTableId, targetTableId);
+      // Sau khi gộp, coi như đang làm việc trên bàn đích.
+      await loadTableActiveOrder(targetTableId);
+      state = state.copyWith(selectedTableId: targetTableId);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
+  Future<void> moveTable(
+    int sourceTableId,
+    int targetTableId, {
+    int? orderId,
+  }) async {
+    try {
+      await _repo.moveTable(sourceTableId, targetTableId, orderId: orderId);
+      await loadTableActiveOrder(targetTableId);
+      state = state.copyWith(selectedTableId: targetTableId);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
+  Future<void> clearTableOrders(int tableId) async {
+    try {
+      await _repo.clearTableOrders(tableId);
+      // Sau khi xóa toàn bộ đơn, bàn vẫn tồn tại nhưng không còn currentOrder
+      state = state.copyWith(
+        clearCurrentOrder: true,
+        selectedTableId: tableId,
+      );
+      await loadActiveOrders();
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }

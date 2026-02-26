@@ -72,10 +72,13 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/active', [OrderController::class, 'active']);
         Route::get('/active-tables', [OrderController::class, 'activeTables']);
         Route::get('/table/{tableId}', [OrderController::class, 'tableOrders']);
+        Route::delete('/table/{tableId}', [OrderController::class, 'clearTableOrders']);
         Route::get('/{id}', [OrderController::class, 'show']);
         Route::put('/{id}', [OrderController::class, 'update']);
         Route::put('/{id}/status', [OrderController::class, 'updateStatus']);
         Route::put('/{id}/pay-items', [OrderController::class, 'payItems']);
+        Route::post('/merge-tables', [OrderController::class, 'mergeTables']);
+        Route::post('/move-table', [OrderController::class, 'moveTable']);
     });
 
     // Invoices

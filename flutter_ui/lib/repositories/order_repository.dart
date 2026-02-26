@@ -202,6 +202,35 @@ class OrderRepository {
     }
   }
 
+  Future<void> mergeTables(int sourceTableId, int targetTableId) async {
+    await _api.post(
+      ApiConfig.mergeTables,
+      data: {
+        'source_table_id': sourceTableId,
+        'target_table_id': targetTableId,
+      },
+    );
+  }
+
+  Future<void> moveTable(
+    int sourceTableId,
+    int targetTableId, {
+    int? orderId,
+  }) async {
+    await _api.post(
+      ApiConfig.moveTable,
+      data: {
+        'source_table_id': sourceTableId,
+        'target_table_id': targetTableId,
+        if (orderId != null) 'order_id': orderId,
+      },
+    );
+  }
+
+  Future<void> clearTableOrders(int tableId) async {
+    await _api.delete('${ApiConfig.orders}/table/$tableId');
+  }
+
   // ---------------------------------------------------------------------------
   // Cache helpers
   // ---------------------------------------------------------------------------

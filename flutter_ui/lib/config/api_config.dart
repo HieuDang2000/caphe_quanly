@@ -21,6 +21,8 @@ class ApiConfig {
   static const String orders = '/orders';
   static const String activeOrders = '/orders/active';
   static const String activeOrderTables = '/orders/active-tables';
+  static const String mergeTables = '/orders/merge-tables';
+  static const String moveTable = '/orders/move-table';
   static const String orderActivities = '/orders/activities';
 
   static const String invoices = '/invoices';

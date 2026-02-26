@@ -5,7 +5,6 @@ import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/layout_provider.dart';
-import '../../providers/invoice_provider.dart';
 import '../../services/receipt_printer.dart';
 
 class OrderCartBar extends ConsumerStatefulWidget {
@@ -22,6 +21,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
   int? _lastOrderId;
   final Set<int> _selectedTableItemIds = {};
   final Set<int> _selectedItemIdsForInvoice = {};
+  final Set<int> _deletingTableItemIds = {};
 
   @override
   Widget build(BuildContext context) {
@@ -37,11 +37,13 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
     final orderStatus = isTableMode ? (orderState.currentOrder?['status'] as String? ?? 'pending') : null;
     if (orderId != null && orderId != _lastOrderId) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() {
-          _lastOrderId = orderId;
-          _selectedTableItemIds.clear();
-          _selectedItemIdsForInvoice.clear();
-        });
+        if (mounted) {
+          setState(() {
+            _lastOrderId = orderId;
+            _selectedTableItemIds.clear();
+            _selectedItemIdsForInvoice.clear();
+          });
+        }
       });
     }
     String displayLabel;
@@ -199,8 +201,15 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
             ),
             if (_expanded) ...[
               const Divider(height: 1),
-              Expanded(
-                child: ListView.builder(
+              if (isTableMode && orderState.isLoading)
+                const Expanded(
+                  child: Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   itemCount: itemCount,
                   itemBuilder: (_, index) {
@@ -209,7 +218,6 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                       final itemId = item['id'] as int?;
                       final qty = Formatters.toNum(item['quantity']).toInt();
                       final subtotal = Formatters.toNum(item['subtotal']);
-                      final unitPrice = qty > 0 ? subtotal / qty : 0.0;
                       final note = item['notes'] as String?;
                       final opts = (item['options'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
                       final optText = opts.isNotEmpty
@@ -235,6 +243,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                         fontStyle: hasNote ? FontStyle.italic : FontStyle.normal,
                       );
                       final isSelectedForInvoice = itemId != null && _selectedItemIdsForInvoice.contains(itemId);
+                      final isDeleting = itemId != null && _deletingTableItemIds.contains(itemId);
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 4),
@@ -259,8 +268,12 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                               ? Checkbox(
                                   value: isSelected,
                                   onChanged: (v) => setState(() {
-                                    if (v == true && itemId != null) _selectedTableItemIds.add(itemId);
-                                    if (v != true && itemId != null) _selectedTableItemIds.remove(itemId);
+                                    if (itemId == null) return;
+                                    if (v == true) {
+                                      _selectedTableItemIds.add(itemId);
+                                    } else {
+                                      _selectedTableItemIds.remove(itemId);
+                                    }
                                   }),
                                 )
                               : null,
@@ -289,7 +302,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                                 ),
                               if (hasNote)
                                 Text(
-                                  note!,
+                                  note ?? '',
                                   style: isItemPaid ? paidSubtitleStyle : TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -308,7 +321,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                               if (!isItemPaid) ...[
                                 IconButton(
                                   icon: const Icon(Icons.remove_circle_outline, size: 20),
-                                  onPressed: () => _updateTableItemQuantity(item, qty - 1),
+                                  onPressed: isDeleting ? null : () => _updateTableItemQuantity(item, qty - 1),
                                 ),
                                 Text(
                                   '$qty',
@@ -316,12 +329,30 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.add_circle_outline, size: 20),
-                                  onPressed: () => _updateTableItemQuantity(item, qty + 1),
+                                  onPressed: isDeleting ? null : () => _updateTableItemQuantity(item, qty + 1),
                                 ),
-                                IconButton(
-                                  icon: Icon(Icons.delete_outline, size: 20, color: Colors.red.shade400),
-                                  onPressed: () => _removeTableItem(item),
-                                ),
+                                if (isDeleting)
+                                  const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                else
+                                  IconButton(
+                                    icon: Icon(Icons.delete_outline, size: 20, color: Colors.red.shade400),
+                                    onPressed: itemId == null
+                                        ? null
+                                        : () async {
+                                            setState(() {
+                                              _deletingTableItemIds.add(itemId);
+                                            });
+                                            await _removeTableItem(item);
+                                            if (!mounted) return;
+                                            setState(() {
+                                              _deletingTableItemIds.remove(itemId);
+                                            });
+                                          },
+                                  ),
                               ],
                             ],
                           ),
@@ -436,56 +467,28 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                       );
                     }
                   },
+                  ),
                 ),
-              ),
-              if (isTableMode && orderId != null)
+              if (isTableMode && orderId != null && !orderState.isLoading)
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (orderStatus == 'pending') ...[
-                        ElevatedButton(
-                          onPressed: () async {
-                            await ref.read(orderProvider.notifier).updateStatus(orderId, 'paid');
-                            if (!mounted) return;
-                            ref.read(orderProvider.notifier).clearCurrentOrder();
-                            if (mounted) setState(() => _selectedTableItemIds.clear());
-                          },
-                          child: const Text('Thanh toán toàn bộ'),
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton(
-                          onPressed: _selectedTableItemIds.isEmpty
-                              ? null
-                              : () async {
-                            final selected = _selectedTableItemIds.toList();
-                            await ref.read(orderProvider.notifier).payItems(orderId, selected);
-                            if (!mounted) return;
-                            await ref.read(orderProvider.notifier).loadOrderById(orderId);
-                            if (mounted) setState(() => _selectedTableItemIds.clear());
-                          },
-                          child: const Text('Thanh toán một phần'),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      if (orderStatus == 'paid') ...[
-                        OutlinedButton(
-                          onPressed: () async {
-                            await ref.read(orderProvider.notifier).updateStatus(orderId, 'pending');
-                            if (!mounted) return;
-                            final tableId = ref.read(orderProvider).selectedTableId;
-                            if (tableId != null) {
-                              await ref.read(orderProvider.notifier).loadTableActiveOrder(tableId);
-                            }
-                            if (mounted) setState(() => _selectedTableItemIds.clear());
-                          },
-                          child: const Text('Về chờ xử lý'),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
                       ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.accentColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
                         onPressed: () async {
                           final currentOrder = ref.read(orderProvider).currentOrder;
                           if (currentOrder == null) return;
@@ -538,9 +541,79 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                             await ReceiptPrinter.print80mm(invoice: partialInvoice);
                           }
                         },
-                        icon: const Icon(Icons.print),
+                        icon: const Icon(Icons.print, size: 22),
                         label: const Text('In hóa đơn'),
                       ),
+                      const SizedBox(height: 8),
+                      if (orderStatus == 'pending') ...[
+                        ElevatedButton(
+                          onPressed: () async {
+                            await ref.read(orderProvider.notifier).updateStatus(orderId, 'paid');
+                            if (!mounted) return;
+                            ref.read(orderProvider.notifier).clearCurrentOrder();
+                            if (mounted) setState(() => _selectedTableItemIds.clear());
+                          },
+                          child: const Text('Thanh toán toàn bộ'),
+                        ),
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: _selectedTableItemIds.isEmpty
+                              ? null
+                              : () async {
+                            final selected = _selectedTableItemIds.toList();
+                            await ref.read(orderProvider.notifier).payItems(orderId, selected);
+                            if (!mounted) return;
+                            await ref.read(orderProvider.notifier).loadOrderById(orderId);
+                            if (mounted) setState(() => _selectedTableItemIds.clear());
+                          },
+                          child: const Text('Thanh toán một phần'),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (orderStatus == 'paid') ...[
+                        OutlinedButton(
+                          onPressed: () async {
+                            await ref.read(orderProvider.notifier).updateStatus(orderId, 'pending');
+                            if (!mounted) return;
+                            final tableId = ref.read(orderProvider).selectedTableId;
+                            if (tableId != null) {
+                              await ref.read(orderProvider.notifier).loadTableActiveOrder(tableId);
+                            }
+                            if (mounted) setState(() => _selectedTableItemIds.clear());
+                          },
+                          child: const Text('Về chờ xử lý'),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (isTableMode && selectedId != null) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => _showMoveTableDialog(selectedId),
+                                child: const Text('Chuyển bàn'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => _showMergeTableDialog(selectedId),
+                                child: const Text('Gộp bàn'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton(
+                          onPressed: () => _confirmDeleteTable(selectedId),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red.shade600,
+                          ),
+                          child: const Text('Xóa đơn của bàn này'),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      
                     ],
                   ),
                 ),
@@ -607,7 +680,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                         Padding(
                           padding: const EdgeInsets.only(left: 8, top: 2),
                           child: Text(
-                            note,
+                            note ?? '',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade600,
@@ -684,8 +757,10 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
       });
     }
 
-    // Map sang payload tối giản cho API.
-    final payloadItems = updatedItems.map<Map<String, dynamic>>((it) {
+    // Map sang payload tối giản cho API, chỉ gửi các item chưa thanh toán (is_paid != true)
+    final payloadItems = updatedItems
+        .where((it) => it['is_paid'] != true)
+        .map<Map<String, dynamic>>((it) {
       final opts = (it['options'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       return {
         'menu_item_id': it['menu_item_id'],
@@ -700,6 +775,118 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
 
   Future<void> _removeTableItem(Map<String, dynamic> item) async {
     await _updateTableItemQuantity(item, 0);
+  }
+
+  Future<void> _showMoveTableDialog(int sourceTableId) async {
+    final layoutState = ref.read(layoutProvider);
+    final tables = layoutState.objects
+        .where((o) => (o['type'] as String?) == 'table' && Formatters.toNum(o['id']).toInt() != sourceTableId)
+        .toList();
+    if (tables.isEmpty) return;
+
+    final targetId = await showDialog<int>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Chuyển bàn'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 300,
+            child: ListView.builder(
+              itemCount: tables.length,
+              itemBuilder: (_, index) {
+                final t = tables[index];
+                final id = Formatters.toNum(t['id']).toInt();
+                final name = (t['name'] as String?) ?? 'Bàn $id';
+                return ListTile(
+                  title: Text(name),
+                  subtitle: Text('ID: $id'),
+                  onTap: () => Navigator.of(ctx).pop(id),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Hủy'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (targetId == null || !mounted) return;
+    await ref.read(orderProvider.notifier).moveTable(sourceTableId, targetId);
+  }
+
+  Future<void> _showMergeTableDialog(int sourceTableId) async {
+    final layoutState = ref.read(layoutProvider);
+    final tables = layoutState.objects
+        .where((o) => (o['type'] as String?) == 'table' && Formatters.toNum(o['id']).toInt() != sourceTableId)
+        .toList();
+    if (tables.isEmpty) return;
+
+    final targetId = await showDialog<int>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Gộp bàn'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 300,
+            child: ListView.builder(
+              itemCount: tables.length,
+              itemBuilder: (_, index) {
+                final t = tables[index];
+                final id = Formatters.toNum(t['id']).toInt();
+                final name = (t['name'] as String?) ?? 'Bàn $id';
+                return ListTile(
+                  title: Text(name),
+                  subtitle: Text('ID: $id'),
+                  onTap: () => Navigator.of(ctx).pop(id),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Hủy'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (targetId == null || !mounted) return;
+    await ref.read(orderProvider.notifier).mergeTables(sourceTableId, targetId);
+  }
+
+  Future<void> _confirmDeleteTable(int tableId) async {
+    final bool? shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xóa đơn của bàn'),
+        content: const Text(
+          'Thao tác này sẽ hủy toàn bộ các đơn đang chờ của bàn này và giữ lại trong lịch sử. Bàn vẫn tồn tại trong sơ đồ. Bạn có chắc muốn tiếp tục?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Xóa đơn'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete != true || !mounted) return;
+
+    await ref.read(orderProvider.notifier).clearTableOrders(tableId);
   }
 }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Floor;
 use App\Models\LayoutObject;
+use App\Models\Order;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -94,7 +95,24 @@ class LayoutController extends Controller
 
     public function destroyObject(int $id): JsonResponse
     {
-        LayoutObject::findOrFail($id)->delete();
+        $object = LayoutObject::findOrFail($id);
+
+        // Nếu object là bàn, hủy (cancel) các đơn pending đang gắn với bàn này
+        if ($object->type === 'table') {
+            $pendingOrders = Order::with('items')
+                ->where('table_id', $object->id)
+                ->where('status', 'pending')
+                ->get();
+
+            foreach ($pendingOrders as $order) {
+                $order->status = 'cancelled';
+                $order->table_id = null;
+                $order->save();
+                $order->recalculate();
+            }
+        }
+
+        $object->delete();
         return response()->json(['message' => 'Xóa thành công']);
     }
 

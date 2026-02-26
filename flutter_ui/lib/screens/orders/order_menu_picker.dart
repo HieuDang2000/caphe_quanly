@@ -18,6 +18,8 @@ class OrderMenuPicker extends ConsumerStatefulWidget {
 class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
   String _menuSearchQuery = '';
   final Map<int, TextEditingController> _noteControllers = {};
+  final Map<int, Set<int>> _selectedOptionIdsByItem = {};
+  final Map<int, bool> _isAddingByItem = {};
 
   @override
   void dispose() {
@@ -161,16 +163,109 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                             final existingOpts = cartEntry != null ? (cartEntry['options'] as List?)?.cast<Map<String, dynamic>>() : null;
                             final basePrice = Formatters.toNum(item['price']);
                             final itemOpts = (item['options'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-                            final hasItemOpts = itemOpts.isNotEmpty;
-                            final optsExtra = (existingOpts ?? []).fold<double>(0, (s, o) => s + Formatters.toNum(o['extra_price']));
+                            // Khởi tạo tick option theo cart hiện tại (nếu có) khi chưa chọn gì.
+                            final existingOptIds = (existingOpts ?? [])
+                                .map((o) => Formatters.toNum(o['id']).toInt())
+                                .where((id) => id > 0)
+                                .toList();
+                            final currentSelected = _selectedOptionIdsByItem[itemId] ?? <int>{};
+                            if (currentSelected.isEmpty && existingOptIds.isNotEmpty) {
+                              _selectedOptionIdsByItem[itemId] = existingOptIds.toSet();
+                            }
+                            final selectedIds = _selectedOptionIdsByItem[itemId] ?? <int>{};
+                            final selectedOpts = itemOpts
+                                .where((o) => selectedIds.contains(Formatters.toNum(o['id']).toInt()))
+                                .toList();
+                            final optsExtra = selectedOpts.fold<double>(0, (s, o) => s + Formatters.toNum(o['extra_price']));
                             final displayPrice = basePrice + optsExtra;
 
                             final noteController = _noteControllers[itemId] ??
                                 TextEditingController(text: itemNote ?? '');
                             _noteControllers[itemId] = noteController;
 
+                            final isAdding = _isAddingByItem[itemId] ?? false;
+
+                            Future<void> handleAdd() async {
+                              if (isAdding) return;
+                              setState(() {
+                                _isAddingByItem[itemId] = true;
+                              });
+                              try {
+                                if (isTableMode) {
+                                  final tableId = orderState.selectedTableId;
+                                  if (tableId == null) return;
+                                  final trimmed = noteController.text.trim();
+                                  final note = trimmed.isEmpty ? null : trimmed;
+                                  final selectedIds = _selectedOptionIdsByItem[itemId] ?? <int>{};
+                                  final selectedOptions = itemOpts
+                                      .where((o) =>
+                                          selectedIds.contains(Formatters.toNum(o['id']).toInt()))
+                                      .map((o) => {
+                                            'id': o['id'],
+                                            'name': o['name'],
+                                            'extra_price': o['extra_price'],
+                                          })
+                                      .toList();
+                                  final existingItems =
+                                      (orderState.currentOrder?['items'] as List?)
+                                              ?.cast<Map<String, dynamic>>() ??
+                                          <Map<String, dynamic>>[];
+                                  final newItems = [
+                                    ...existingItems,
+                                    {
+                                      'menu_item_id': itemId,
+                                      'name': item['name'],
+                                      'price': basePrice,
+                                      'quantity': 1,
+                                      'notes': note,
+                                      'options': selectedOptions,
+                                    },
+                                  ];
+                                  await ref
+                                      .read(orderProvider.notifier)
+                                      .saveTableOrderItems(tableId, newItems);
+                                  noteController.clear();
+                                } else if (qty > 0) {
+                                  ref.read(orderProvider.notifier).updateCartQuantity(
+                                        itemId,
+                                        qty + 1,
+                                        options: existingOpts,
+                                        notes: itemNote,
+                                      );
+                                } else {
+                                  final trimmed = noteController.text.trim();
+                                  final note = trimmed.isEmpty ? null : trimmed;
+                                  final selectedIds = _selectedOptionIdsByItem[itemId] ?? <int>{};
+                                  final selectedOptions = itemOpts
+                                      .where((o) =>
+                                          selectedIds.contains(Formatters.toNum(o['id']).toInt()))
+                                      .map((o) => {
+                                            'id': o['id'],
+                                            'name': o['name'],
+                                            'extra_price': o['extra_price'],
+                                          })
+                                      .toList();
+                                  ref.read(orderProvider.notifier).addToCart(
+                                        item,
+                                        notes: note,
+                                        quantity: 1,
+                                        options: selectedOptions.isEmpty ? null : selectedOptions,
+                                      );
+                                  noteController.clear();
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() {
+                                    _isAddingByItem[itemId] = false;
+                                  });
+                                }
+                              }
+                            }
+
                             return Card(
-                              child: Padding(
+                              child: InkWell(
+                                onTap: isAdding ? null : () => handleAdd(),
+                                child: Padding(
                                   padding: const EdgeInsets.all(8),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,40 +274,50 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                         item['name'],
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w600,
-                                          fontSize: 14,
+                                          fontSize: 16,
                                         ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        hasItemOpts && (existingOpts ?? []).isEmpty
-                                            ? 'Từ ${Formatters.currency(displayPrice)}'
+                                        selectedOpts.isEmpty
+                                            ? Formatters.currency(basePrice)
                                             : Formatters.currency(displayPrice),
                                         style: const TextStyle(fontSize: 13),
                                       ),
-                                      if (hasItemOpts && (existingOpts ?? []).isEmpty)
+                                      if (itemOpts.isNotEmpty)
                                         Padding(
-                                          padding: const EdgeInsets.only(top: 2),
-                                          child: Text(
-                                            itemOpts
-                                                .map((o) => '${o['name']} +${Formatters.currency(o['extra_price'])}')
-                                                .join(' · '),
-                                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      if ((existingOpts ?? []).isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 2),
-                                          child: Text(
-                                            (existingOpts ?? [])
-                                                .map((o) => '${o['name']} +${Formatters.currency(o['extra_price'])}')
-                                                .join(' · '),
-                                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                          padding: const EdgeInsets.only(top: 4),
+                                          child: Wrap(
+                                            spacing: 4,
+                                            runSpacing: 2,
+                                            children: itemOpts.map((o) {
+                                              final optId = Formatters.toNum(o['id']).toInt();
+                                              final checked = selectedIds.contains(optId);
+                                              final label =
+                                                  '${o['name']} +${Formatters.currency(o['extra_price'])}';
+                                              return FilterChip(
+                                                label: Text(
+                                                  label,
+                                                  style: const TextStyle(fontSize: 11),
+                                                ),
+                                                selected: checked,
+                                                selectedColor: AppTheme.primaryColor.withOpacity(0.12),
+                                                checkmarkColor: AppTheme.primaryColor,
+                                                onSelected: (v) {
+                                                  setState(() {
+                                                    final set = _selectedOptionIdsByItem[itemId] ?? <int>{};
+                                                    if (v) {
+                                                      set.add(optId);
+                                                    } else {
+                                                      set.remove(optId);
+                                                    }
+                                                    _selectedOptionIdsByItem[itemId] = set;
+                                                  });
+                                                },
+                                              );
+                                            }).toList(),
                                           ),
                                         ),
                                       const SizedBox(height: 3),
@@ -245,34 +350,22 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                               },
                                             ),
                                           ),
-                                          if (isTableMode)
+                                          if (isAdding)
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 8),
+                                              child: SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: const CircularProgressIndicator(strokeWidth: 2),
+                                              ),
+                                            )
+                                          else if (isTableMode)
                                             IconButton(
                                               icon: const Icon(Icons.add_circle, color: AppTheme.primaryColor),
                                               padding: EdgeInsets.zero,
                                               constraints: const BoxConstraints(),
-                                              onPressed: () async {
-                                                final tableId = orderState.selectedTableId;
-                                                if (tableId == null) return;
-                                                final trimmed = noteController.text.trim();
-                                                final note = trimmed.isEmpty ? null : trimmed;
-                                                final existingItems =
-                                                    (orderState.currentOrder?['items'] as List?)?.cast<Map<String, dynamic>>() ??
-                                                        <Map<String, dynamic>>[];
-                                                final newItems = [
-                                                  ...existingItems,
-                                                  {
-                                                    'menu_item_id': itemId,
-                                                    'name': item['name'],
-                                                    'price': basePrice,
-                                                    'quantity': 1,
-                                                    'notes': note,
-                                                    'options': <Map<String, dynamic>>[],
-                                                  },
-                                                ];
-                                                await ref
-                                                    .read(orderProvider.notifier)
-                                                    .saveTableOrderItems(tableId, newItems);
-                                                noteController.clear();
+                                              onPressed: () {
+                                                handleAdd();
                                               },
                                             )
                                           else if (qty > 0) ...[
@@ -298,12 +391,9 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                               icon: const Icon(Icons.add_circle_outline, size: 20),
                                               padding: EdgeInsets.zero,
                                               constraints: const BoxConstraints(),
-                                              onPressed: () => ref.read(orderProvider.notifier).updateCartQuantity(
-                                                    itemId,
-                                                    qty + 1,
-                                                    options: existingOpts,
-                                                    notes: itemNote,
-                                                  ),
+                                              onPressed: () {
+                                                handleAdd();
+                                              },
                                             ),
                                           ] else
                                             IconButton(
@@ -311,21 +401,14 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                               padding: EdgeInsets.zero,
                                               constraints: const BoxConstraints(),
                                               onPressed: () {
-                                                final trimmed = noteController.text.trim();
-                                                final note = trimmed.isEmpty ? null : trimmed;
-                                                ref.read(orderProvider.notifier).addToCart(
-                                                      item,
-                                                      notes: note,
-                                                      quantity: 1,
-                                                      options: null,
-                                                    );
-                                                noteController.clear();
+                                                handleAdd();
                                               },
                                             ),
                                         ],
                                       ),
                                     ],
                                   ),
+                                ),
                               ),
                             );
                           },
