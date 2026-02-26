@@ -19,7 +19,7 @@ class OrderRepository {
     String? date,
     bool forceRefresh = false,
   }) async {
-    final local = await _queryLocalOrders(status: status);
+    final local = await _queryLocalOrders(status: status, date: date);
     if (local.isNotEmpty && !forceRefresh) {
       // Fire-and-forget refresh; UI dùng dữ liệu cache ngay lập tức.
       _refreshOrders(status: status, date: date);
@@ -33,10 +33,43 @@ class OrderRepository {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _queryLocalOrders({String? status}) async {
+  /// Trả về [utcStart, utcEnd] ISO string cho ngày YYYY-MM-DD theo giờ VN (UTC+7).
+  static List<String> _vietnamDateToUtcBounds(String dateStr) {
+    final parts = dateStr.split('-');
+    if (parts.length != 3) return [];
+    final y = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 1;
+    final d = int.tryParse(parts[2]) ?? 1;
+    // 00:00 VN = UTC cùng ngày - 7h; 24:00 VN = UTC ngày sau - 7h
+    final startUtc = DateTime.utc(y, m, d).subtract(const Duration(hours: 7));
+    final endUtc = startUtc.add(const Duration(days: 1));
+    return [
+      startUtc.toIso8601String(),
+      endUtc.toIso8601String(),
+    ];
+  }
+
+  Future<List<Map<String, dynamic>>> _queryLocalOrders({String? status, String? date}) async {
+    String? where;
+    List<Object?> whereArgs = [];
     if (status != null) {
+      where = 'status = ?';
+      whereArgs.add(status);
+    }
+    if (date != null) {
+      final bounds = _vietnamDateToUtcBounds(date);
+      if (bounds.length == 2) {
+        if (where != null) {
+          where = '$where AND created_at >= ? AND created_at < ?';
+        } else {
+          where = 'created_at >= ? AND created_at < ?';
+        }
+        whereArgs.addAll(bounds);
+      }
+    }
+    if (where != null) {
       return _db.queryWhere('orders',
-          where: 'status = ?', whereArgs: [status], orderBy: 'id DESC');
+          where: where, whereArgs: whereArgs, orderBy: 'id DESC');
     }
     return _db.queryAll('orders', orderBy: 'id DESC');
   }

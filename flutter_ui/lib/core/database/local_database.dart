@@ -1,9 +1,8 @@
 import 'dart:convert' as convert;
 
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sqflite_common/sqlite_api.dart';
+import 'database_factory_io.dart' if (dart.library.html) 'database_factory_web.dart' as db_factory;
 
 const _dbVersion = 2;
 
@@ -20,10 +19,8 @@ class LocalDatabase {
   }
 
   Future<Database> _open() async {
-    sqfliteFfiInit();
-    final databaseFactory = databaseFactoryFfi;
-    final dir = await getApplicationSupportDirectory();
-    final dbPath = p.join(dir.path, 'caphe_quanly.db');
+    final databaseFactory = db_factory.getDatabaseFactory();
+    final dbPath = await db_factory.getDatabasePath();
     return databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
