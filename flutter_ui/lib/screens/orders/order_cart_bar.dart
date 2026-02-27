@@ -554,13 +554,17 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                           },
                           child: const Text('Thanh toán toàn bộ'),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
                         ElevatedButton(
                           onPressed: tableItems.any((i) => i['is_paid'] != true)
                               ? () async {
                                   await _showPartialPaymentDialog(orderId, tableItems);
                                 }
                               : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.warningColor,
+                            foregroundColor: Colors.white,
+                          ),
                           child: const Text('Thanh toán một phần'),
                         ),
                         const SizedBox(height: 8),
