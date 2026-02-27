@@ -202,6 +202,12 @@ class OrderRepository {
     }
   }
 
+  Future<void> payItemsWithQuantities(int orderId, List<Map<String, dynamic>> items) async {
+    await _api.put('${ApiConfig.orders}/$orderId/pay-items', data: {
+      'items': items,
+    });
+  }
+
   Future<void> mergeTables(int sourceTableId, int targetTableId) async {
     await _api.post(
       ApiConfig.mergeTables,

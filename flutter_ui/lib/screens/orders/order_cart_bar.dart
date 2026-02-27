@@ -268,11 +268,10 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                               ? Checkbox(
                                   value: isSelected,
                                   onChanged: (v) => setState(() {
-                                    if (itemId == null) return;
                                     if (v == true) {
-                                      _selectedTableItemIds.add(itemId);
+                                      _selectedTableItemIds.add(itemId!);
                                     } else {
-                                      _selectedTableItemIds.remove(itemId);
+                                      _selectedTableItemIds.remove(itemId!);
                                     }
                                   }),
                                 )
@@ -401,9 +400,9 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                              if (hasNote)
+                              if (hasNote && note != null)
                                 Text(
-                                  note!,
+                                  note,
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: Colors.grey.shade600,
@@ -557,15 +556,11 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                         ),
                         const SizedBox(height: 8),
                         ElevatedButton(
-                          onPressed: _selectedTableItemIds.isEmpty
-                              ? null
-                              : () async {
-                            final selected = _selectedTableItemIds.toList();
-                            await ref.read(orderProvider.notifier).payItems(orderId, selected);
-                            if (!mounted) return;
-                            await ref.read(orderProvider.notifier).loadOrderById(orderId);
-                            if (mounted) setState(() => _selectedTableItemIds.clear());
-                          },
+                          onPressed: tableItems.any((i) => i['is_paid'] != true)
+                              ? () async {
+                                  await _showPartialPaymentDialog(orderId, tableItems);
+                                }
+                              : null,
                           child: const Text('Thanh toán một phần'),
                         ),
                         const SizedBox(height: 8),
@@ -622,6 +617,170 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
         ),
       ),
     );
+  }
+
+  Future<void> _showPartialPaymentDialog(int orderId, List<Map<String, dynamic>> tableItems) async {
+    final unpaidItems = tableItems.where((i) => i['is_paid'] != true).toList();
+    if (unpaidItems.isEmpty) return;
+
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (ctx) {
+        final quantities = <int, int>{};
+        for (final item in unpaidItems) {
+          final id = Formatters.toNum(item['id']).toInt();
+          final qty = Formatters.toNum(item['quantity']).toInt();
+          if (id <= 0 || qty <= 0) continue;
+          quantities[id] = 1;
+        }
+
+        return AlertDialog(
+          title: const Text('Thanh toán một phần'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return SizedBox(
+                width: 480,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: unpaidItems.map((item) {
+                      final id = Formatters.toNum(item['id']).toInt();
+                      final name = item['menu_item']?['name']?.toString() ?? (item['name']?.toString() ?? '');
+                      final originalQty = Formatters.toNum(item['quantity']).toInt();
+                      if (id <= 0 || originalQty <= 0) {
+                        return const SizedBox.shrink();
+                      }
+                      final opts = (item['options'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+                      final note = item['notes'] as String?;
+                      final hasNote = note != null && note.trim().isNotEmpty;
+                      final optText = opts.isNotEmpty
+                          ? opts
+                              .map((o) => '${o['name']} +${Formatters.currency(Formatters.toNum(o['extra_price']))}')
+                              .join(' · ')
+                          : null;
+                      final payQty = quantities[id] ?? 0;
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'SL gốc: $originalQty',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                      ),
+                                    ],
+                                  ),
+                                  if (optText != null)
+                                    Text(
+                                      optText,
+                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  if (hasNote && note != null)
+                                    Text(
+                                      note,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline, size: 20),
+                                  onPressed: payQty > 0
+                                      ? () {
+                                          setState(() {
+                                            final current = quantities[id] ?? 0;
+                                            quantities[id] = current > 0 ? current - 1 : 0;
+                                          });
+                                        }
+                                      : null,
+                                ),
+                                Text(
+                                  '$payQty',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.add_circle_outline, size: 20),
+                                  onPressed: payQty < originalQty
+                                      ? () {
+                                          setState(() {
+                                            final current = quantities[id] ?? 0;
+                                            if (current < originalQty) {
+                                              quantities[id] = current + 1;
+                                            }
+                                          });
+                                        }
+                                      : null,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final itemsToPay = <Map<String, dynamic>>[];
+                quantities.forEach((id, qty) {
+                  if (qty > 0) {
+                    itemsToPay.add({
+                      'item_id': id,
+                      'quantity': qty,
+                    });
+                  }
+                });
+                Navigator.of(ctx).pop(itemsToPay);
+              },
+              child: const Text('Xác nhận'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) return;
+    final itemsToPay = (result ?? []).cast<Map<String, dynamic>>();
+    if (itemsToPay.isEmpty) return;
+
+    await ref.read(orderProvider.notifier).payItemsWithQuantities(orderId, itemsToPay);
+    await ref.read(orderProvider.notifier).loadOrderById(orderId);
+    if (mounted) {
+      setState(() {
+        _selectedTableItemIds.clear();
+      });
+    }
   }
 
   void _openBottomSheet(BuildContext context) {

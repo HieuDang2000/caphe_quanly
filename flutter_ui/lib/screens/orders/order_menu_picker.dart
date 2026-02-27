@@ -185,6 +185,133 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
 
                             final isAdding = _isAddingByItem[itemId] ?? false;
 
+                            Future<void> handleAddWithOptions(List<Map<String, dynamic>> selectedOptions) async {
+                              if (isAdding) return;
+                              setState(() {
+                                _isAddingByItem[itemId] = true;
+                              });
+                              try {
+                                final trimmed = noteController.text.trim();
+                                final note = trimmed.isEmpty ? null : trimmed;
+
+                                if (isTableMode) {
+                                  final tableId = orderState.selectedTableId;
+                                  if (tableId == null) return;
+
+                                  final allItems =
+                                      (orderState.currentOrder?['items'] as List?)
+                                              ?.cast<Map<String, dynamic>>() ??
+                                          <Map<String, dynamic>>[];
+                                  final existingItems = allItems
+                                      .where((it) => it['is_paid'] != true)
+                                      .toList();
+                                  final existingIndex = existingItems.indexWhere((it) {
+                                    if (Formatters.toNum(it['menu_item_id']).toInt() != itemId) {
+                                      return false;
+                                    }
+                                    final existingNote = it['notes'] as String?;
+                                    if ((existingNote ?? '') != (note ?? '')) {
+                                      return false;
+                                    }
+                                    final existingOptions =
+                                        (it['options'] as List?)?.cast<Map<String, dynamic>>() ??
+                                            <Map<String, dynamic>>[];
+                                    if (existingOptions.length != selectedOptions.length) {
+                                      return false;
+                                    }
+                                    final selectedIds = selectedOptions
+                                        .map((o) => Formatters.toNum(o['id']).toInt())
+                                        .toSet();
+                                    final existingIds = existingOptions
+                                        .map((o) => Formatters.toNum(o['id']).toInt())
+                                        .toSet();
+                                    return selectedIds.length == existingIds.length &&
+                                        selectedIds.containsAll(existingIds);
+                                  });
+
+                                  List<Map<String, dynamic>> newItems;
+                                  if (existingIndex >= 0) {
+                                    final updatedItems = List<Map<String, dynamic>>.from(existingItems);
+                                    final existing = Map<String, dynamic>.from(updatedItems[existingIndex]);
+                                    final currentQty = Formatters.toNum(existing['quantity']).toInt();
+                                    existing['quantity'] = currentQty + 1;
+                                    updatedItems[existingIndex] = existing;
+                                    newItems = updatedItems;
+                                  } else {
+                                    newItems = [
+                                      ...existingItems,
+                                      {
+                                        'menu_item_id': itemId,
+                                        'name': item['name'],
+                                        'price': basePrice,
+                                        'quantity': 1,
+                                        'notes': note,
+                                        'options': selectedOptions,
+                                      },
+                                    ];
+                                  }
+                                  await ref
+                                      .read(orderProvider.notifier)
+                                      .saveTableOrderItems(tableId, newItems);
+                                  noteController.clear();
+                                } else {
+                                  final cartItems =
+                                      orderState.cartItems.cast<Map<String, dynamic>>();
+                                  final existingIndex = cartItems.indexWhere((c) {
+                                    if (Formatters.toNum(c['menu_item_id']).toInt() != itemId) {
+                                      return false;
+                                    }
+                                    final existingNote = c['notes'] as String?;
+                                    if ((existingNote ?? '') != (note ?? '')) {
+                                      return false;
+                                    }
+                                    final existingOptions =
+                                        (c['options'] as List?)?.cast<Map<String, dynamic>>() ??
+                                            <Map<String, dynamic>>[];
+                                    if (existingOptions.length != selectedOptions.length) {
+                                      return false;
+                                    }
+                                    final selectedIds = selectedOptions
+                                        .map((o) => Formatters.toNum(o['id']).toInt())
+                                        .toSet();
+                                    final existingIds = existingOptions
+                                        .map((o) => Formatters.toNum(o['id']).toInt())
+                                        .toSet();
+                                    return selectedIds.length == existingIds.length &&
+                                        selectedIds.containsAll(existingIds);
+                                  });
+
+                                  if (existingIndex >= 0) {
+                                    final existing = cartItems[existingIndex];
+                                    final currentQty =
+                                        Formatters.toNum(existing['quantity']).toInt();
+                                    final existingOpts =
+                                        (existing['options'] as List?)?.cast<Map<String, dynamic>>();
+                                    final existingNote = existing['notes'] as String?;
+                                    ref.read(orderProvider.notifier).updateCartQuantity(
+                                          itemId,
+                                          currentQty + 1,
+                                          options: existingOpts,
+                                          notes: existingNote,
+                                        );
+                                  } else {
+                                    ref.read(orderProvider.notifier).addToCart(
+                                          item,
+                                          notes: note,
+                                          quantity: 1,
+                                          options: selectedOptions.isEmpty ? null : selectedOptions,
+                                        );
+                                  }
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() {
+                                    _isAddingByItem[itemId] = false;
+                                  });
+                                }
+                              }
+                            }
+
                             Future<void> handleAdd() async {
                               if (isAdding) return;
                               setState(() {
@@ -206,21 +333,58 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                             'extra_price': o['extra_price'],
                                           })
                                       .toList();
-                                  final existingItems =
+                                  final allItems =
                                       (orderState.currentOrder?['items'] as List?)
                                               ?.cast<Map<String, dynamic>>() ??
                                           <Map<String, dynamic>>[];
-                                  final newItems = [
-                                    ...existingItems,
-                                    {
-                                      'menu_item_id': itemId,
-                                      'name': item['name'],
-                                      'price': basePrice,
-                                      'quantity': 1,
-                                      'notes': note,
-                                      'options': selectedOptions,
-                                    },
-                                  ];
+                                  final existingItems = allItems
+                                      .where((it) => it['is_paid'] != true)
+                                      .toList();
+                                  final existingIndex = existingItems.indexWhere((it) {
+                                    if (Formatters.toNum(it['menu_item_id']).toInt() != itemId) {
+                                      return false;
+                                    }
+                                    final existingNote = it['notes'] as String?;
+                                    if ((existingNote ?? '') != (note ?? '')) {
+                                      return false;
+                                    }
+                                    final existingOptions =
+                                        (it['options'] as List?)?.cast<Map<String, dynamic>>() ??
+                                            <Map<String, dynamic>>[];
+                                    if (existingOptions.length != selectedOptions.length) {
+                                      return false;
+                                    }
+                                    final selectedIdsSet = selectedOptions
+                                        .map((o) => Formatters.toNum(o['id']).toInt())
+                                        .toSet();
+                                    final existingIds = existingOptions
+                                        .map((o) => Formatters.toNum(o['id']).toInt())
+                                        .toSet();
+                                    return selectedIdsSet.length == existingIds.length &&
+                                        selectedIdsSet.containsAll(existingIds);
+                                  });
+
+                                  List<Map<String, dynamic>> newItems;
+                                  if (existingIndex >= 0) {
+                                    final updatedItems = List<Map<String, dynamic>>.from(existingItems);
+                                    final existing = Map<String, dynamic>.from(updatedItems[existingIndex]);
+                                    final currentQty = Formatters.toNum(existing['quantity']).toInt();
+                                    existing['quantity'] = currentQty + 1;
+                                    updatedItems[existingIndex] = existing;
+                                    newItems = updatedItems;
+                                  } else {
+                                    newItems = [
+                                      ...existingItems,
+                                      {
+                                        'menu_item_id': itemId,
+                                        'name': item['name'],
+                                        'price': basePrice,
+                                        'quantity': 1,
+                                        'notes': note,
+                                        'options': selectedOptions,
+                                      },
+                                    ];
+                                  }
                                   await ref
                                       .read(orderProvider.notifier)
                                       .saveTableOrderItems(tableId, newItems);
@@ -245,12 +409,53 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                             'extra_price': o['extra_price'],
                                           })
                                       .toList();
-                                  ref.read(orderProvider.notifier).addToCart(
-                                        item,
-                                        notes: note,
-                                        quantity: 1,
-                                        options: selectedOptions.isEmpty ? null : selectedOptions,
-                                      );
+                                  final cartItems =
+                                      orderState.cartItems.cast<Map<String, dynamic>>();
+                                  final existingIndex = cartItems.indexWhere((c) {
+                                    if (Formatters.toNum(c['menu_item_id']).toInt() != itemId) {
+                                      return false;
+                                    }
+                                    final existingNote = c['notes'] as String?;
+                                    if ((existingNote ?? '') != (note ?? '')) {
+                                      return false;
+                                    }
+                                    final existingOptions =
+                                        (c['options'] as List?)?.cast<Map<String, dynamic>>() ??
+                                            <Map<String, dynamic>>[];
+                                    if (existingOptions.length != selectedOptions.length) {
+                                      return false;
+                                    }
+                                    final selectedIdsSet = selectedOptions
+                                        .map((o) => Formatters.toNum(o['id']).toInt())
+                                        .toSet();
+                                    final existingIds = existingOptions
+                                        .map((o) => Formatters.toNum(o['id']).toInt())
+                                        .toSet();
+                                  return selectedIdsSet.length == existingIds.length &&
+                                      selectedIdsSet.containsAll(existingIds);
+                                  });
+
+                                  if (existingIndex >= 0) {
+                                    final existing = cartItems[existingIndex];
+                                    final currentQty =
+                                        Formatters.toNum(existing['quantity']).toInt();
+                                    final existingOpts =
+                                        (existing['options'] as List?)?.cast<Map<String, dynamic>>();
+                                    final existingNote = existing['notes'] as String?;
+                                    ref.read(orderProvider.notifier).updateCartQuantity(
+                                          itemId,
+                                          currentQty + 1,
+                                          options: existingOpts,
+                                          notes: existingNote,
+                                        );
+                                  } else {
+                                    ref.read(orderProvider.notifier).addToCart(
+                                          item,
+                                          notes: note,
+                                          quantity: 1,
+                                          options: selectedOptions.isEmpty ? null : selectedOptions,
+                                        );
+                                  }
                                   noteController.clear();
                                 }
                               } finally {
@@ -293,8 +498,6 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                             spacing: 4,
                                             runSpacing: 2,
                                             children: itemOpts.map((o) {
-                                              final optId = Formatters.toNum(o['id']).toInt();
-                                              final checked = selectedIds.contains(optId);
                                               final label =
                                                   '${o['name']} +${Formatters.currency(o['extra_price'])}';
                                               return FilterChip(
@@ -302,19 +505,16 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                                   label,
                                                   style: const TextStyle(fontSize: 11),
                                                 ),
-                                                selected: checked,
+                                                selected: false,
                                                 selectedColor: AppTheme.primaryColor.withOpacity(0.12),
                                                 checkmarkColor: AppTheme.primaryColor,
-                                                onSelected: (v) {
-                                                  setState(() {
-                                                    final set = _selectedOptionIdsByItem[itemId] ?? <int>{};
-                                                    if (v) {
-                                                      set.add(optId);
-                                                    } else {
-                                                      set.remove(optId);
-                                                    }
-                                                    _selectedOptionIdsByItem[itemId] = set;
-                                                  });
+                                                onSelected: (_) {
+                                                  final selectedOption = {
+                                                    'id': o['id'],
+                                                    'name': o['name'],
+                                                    'extra_price': o['extra_price'],
+                                                  };
+                                                  handleAddWithOptions([selectedOption]);
                                                 },
                                               );
                                             }).toList(),

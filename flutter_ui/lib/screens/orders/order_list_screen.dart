@@ -275,7 +275,22 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                           if (orderId == null) return;
                                           final selected = _selectedItemsByOrder[orderId] ?? <int>{};
                                           if (selected.isEmpty) return;
-                                          await ref.read(orderProvider.notifier).payItems(orderId, selected.toList(), statusFilter: _statusFilter, date: _selectedDate);
+                                          // Thanh toán toàn bộ quantity của các dòng được chọn.
+                                          final itemsToPay = selected
+                                              .map((itemId) => {
+                                                    'item_id': itemId,
+                                                    'quantity': (order['items'] as List)
+                                                            .cast<Map<String, dynamic>>()
+                                                            .firstWhere((it) => it['id'] == itemId)['quantity'] ??
+                                                        1,
+                                                  })
+                                              .toList();
+                                          await ref.read(orderProvider.notifier).payItemsWithQuantities(
+                                                orderId,
+                                                itemsToPay,
+                                                statusFilter: _statusFilter,
+                                                date: _selectedDate,
+                                              );
                                           if (!mounted) return;
                                           setState(() {
                                             _selectedItemsByOrder[orderId] = <int>{};

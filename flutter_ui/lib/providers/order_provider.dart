@@ -318,6 +318,21 @@ class OrderNotifier extends StateNotifier<OrderState> {
     }
   }
 
+  Future<void> payItemsWithQuantities(
+    int orderId,
+    List<Map<String, dynamic>> items, {
+    String? statusFilter,
+    String? date,
+  }) async {
+    try {
+      await _repo.payItemsWithQuantities(orderId, items);
+      await loadActiveOrders();
+      await loadOrders(status: statusFilter, date: date);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
   Future<void> mergeTables(int sourceTableId, int targetTableId) async {
     try {
       await _repo.mergeTables(sourceTableId, targetTableId);

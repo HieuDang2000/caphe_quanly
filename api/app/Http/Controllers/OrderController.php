@@ -104,25 +104,87 @@ class OrderController extends Controller
 
     public function payItems(Request $request, int $id): JsonResponse
     {
+        // Hỗ trợ cả payload cũ (item_ids) và payload mới (items với quantity).
+        if ($request->has('items')) {
+            $validator = Validator::make($request->all(), [
+                'items' => 'required|array|min:1',
+                'items.*.item_id' => 'required|integer|exists:order_items,id',
+                'items.*.quantity' => 'required|integer|min:1',
+            ]);
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
+            $order = Order::with('items')->findOrFail($id);
+
+            foreach ($request->input('items', []) as $payloadItem) {
+                $itemId = (int) $payloadItem['item_id'];
+                $payQty = (int) $payloadItem['quantity'];
+
+                if ($payQty <= 0) {
+                    continue;
+                }
+
+                $item = $order->items->firstWhere('id', $itemId);
+                if (!$item || $item->is_paid) {
+                    continue;
+                }
+
+                $currentQty = (int) $item->quantity;
+                if ($currentQty <= 0) {
+                    continue;
+                }
+
+                if ($payQty >= $currentQty) {
+                    // Thanh toán toàn bộ dòng hiện tại.
+                    $item->is_paid = true;
+                    $item->save();
+                } else {
+                    // Tách dòng: tạo item mới đã thanh toán một phần, giảm quantity của dòng gốc.
+                    $paidItem = $item->replicate();
+                    $paidItem->quantity = $payQty;
+                    $paidItem->is_paid = true;
+                    // Cập nhật subtotal cho dòng đã thanh toán.
+                    $paidItem->subtotal = $paidItem->unit_price * $paidItem->quantity;
+                    $paidItem->save();
+
+                    $item->quantity = $currentQty - $payQty;
+                    $item->subtotal = $item->unit_price * $item->quantity;
+                    $item->save();
+                }
+            }
+
+            // Tính lại tổng tiền và trạng thái đơn.
+            $order->recalculate();
+            $order->refresh()->load(['items.menuItem', 'table', 'user']);
+
+            if ($order->items->isNotEmpty() && $order->items->every(fn ($item) => $item->is_paid)) {
+                $order->update(['status' => 'paid']);
+            }
+
+            return response()->json($order);
+        }
+
+        // Payload cũ: danh sách item_ids – vẫn hỗ trợ để giữ tương thích.
         $validator = Validator::make($request->all(), [
             'item_ids' => 'required|array|min:1',
             'item_ids.*' => 'required|integer|exists:order_items,id',
         ]);
-        if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
         $order = Order::with('items')->findOrFail($id);
 
-        // Chỉ cập nhật các item thuộc đơn này
         $order->items()
             ->whereIn('id', $request->input('item_ids', []))
             ->update(['is_paid' => true]);
-        
-        $order->total -= $order->items()->whereIn('id', $request->input('item_ids', []))->sum('subtotal');
-        $order->save();
 
+        // Dùng recalculate thay vì thao tác thủ công trên total.
+        $order->recalculate();
         $order->refresh()->load(['items.menuItem', 'table', 'user']);
 
-        if ($order->items->every(fn ($item) => $item->is_paid)) {
+        if ($order->items->isNotEmpty() && $order->items->every(fn ($item) => $item->is_paid)) {
             $order->update(['status' => 'paid']);
         }
 
