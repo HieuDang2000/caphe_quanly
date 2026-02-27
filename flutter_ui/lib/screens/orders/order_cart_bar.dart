@@ -269,9 +269,9 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                                   value: isSelected,
                                   onChanged: (v) => setState(() {
                                     if (v == true) {
-                                      _selectedTableItemIds.add(itemId!);
+                                      _selectedTableItemIds.add(itemId);
                                     } else {
-                                      _selectedTableItemIds.remove(itemId!);
+                                      _selectedTableItemIds.remove(itemId);
                                     }
                                   }),
                                 )
@@ -301,7 +301,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                                 ),
                               if (hasNote)
                                 Text(
-                                  note ?? '',
+                                  note,
                                   style: isItemPaid ? paidSubtitleStyle : TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -400,7 +400,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                              if (hasNote && note != null)
+                              if (hasNote)
                                 Text(
                                   note,
                                   style: TextStyle(
@@ -584,7 +584,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                         ),
                         const SizedBox(height: 8),
                       ],
-                      if (isTableMode && selectedId != null) ...[
+                      if (isTableMode) ...[
                         Row(
                           children: [
                             Expanded(
@@ -635,7 +635,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
           final id = Formatters.toNum(item['id']).toInt();
           final qty = Formatters.toNum(item['quantity']).toInt();
           if (id <= 0 || qty <= 0) continue;
-          quantities[id] = 1;
+          quantities[id] = 0;
         }
 
         return AlertDialog(
@@ -692,7 +692,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                  if (hasNote && note != null)
+                                  if (hasNote)
                                     Text(
                                       note,
                                       style: TextStyle(
@@ -778,6 +778,54 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
     final itemsToPay = (result ?? []).cast<Map<String, dynamic>>();
     if (itemsToPay.isEmpty) return;
 
+    // Chuẩn bị dữ liệu in hóa đơn từ lựa chọn hiện tại.
+    final qtyByItemId = <int, int>{};
+    for (final p in itemsToPay) {
+      final itemId = Formatters.toNum(p['item_id']).toInt();
+      final qty = Formatters.toNum(p['quantity']).toInt();
+      if (itemId > 0 && qty > 0) {
+        qtyByItemId[itemId] = (qtyByItemId[itemId] ?? 0) + qty;
+      }
+    }
+    final itemsToPrint = <Map<String, dynamic>>[];
+    for (final it in unpaidItems) {
+      final id = Formatters.toNum(it['id']).toInt();
+      final payQty = qtyByItemId[id] ?? 0;
+      if (payQty <= 0) continue;
+      final originalQty = Formatters.toNum(it['quantity']).toInt();
+      final originalSubtotal = Formatters.toNum(it['subtotal']);
+      final unit = originalQty > 0 ? (originalSubtotal / originalQty) : 0;
+      itemsToPrint.add({
+        ...it,
+        'quantity': payQty,
+        'subtotal': unit * payQty,
+        // In trước khi gọi API, nên giữ trạng thái chưa thanh toán.
+        'is_paid': false,
+      });
+    }
+
+    if (itemsToPrint.isNotEmpty) {
+      final currentOrder = ref.read(orderProvider).currentOrder;
+      if (currentOrder != null) {
+        final partialSubtotal = itemsToPrint.fold<double>(
+          0,
+          (s, i) => s + Formatters.toNum(i['subtotal']),
+        );
+        final partialOrder = Map<String, dynamic>.from(currentOrder);
+        partialOrder['items'] = itemsToPrint;
+        final partialInvoice = <String, dynamic>{
+          'invoice_number': currentOrder['invoice']?['invoice_number'] ??
+              '${currentOrder['order_number'] ?? ''}-partial',
+          'created_at': DateTime.now().toIso8601String(),
+          'subtotal': partialSubtotal,
+          'total': partialSubtotal,
+          'discount_amount': 0,
+          'order': partialOrder,
+        };
+        await ReceiptPrinter.print80mm(invoice: partialInvoice);
+      }
+    }
+
     await ref.read(orderProvider.notifier).payItemsWithQuantities(orderId, itemsToPay);
     await ref.read(orderProvider.notifier).loadOrderById(orderId);
     if (mounted) {
@@ -843,7 +891,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                         Padding(
                           padding: const EdgeInsets.only(left: 8, top: 2),
                           child: Text(
-                            note ?? '',
+                            note,
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade600,
