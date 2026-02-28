@@ -242,7 +242,7 @@ class OrderController extends Controller
         foreach ($orders as $order) {
             $order->update([
                 'status' => 'cancelled',
-                'table_id' => null,
+                // 'table_id' => null,
             ]);
             // Đảm bảo các item được đánh dấu chưa thanh toán và tổng tiền được tính lại
             $order->items()->update(['is_paid' => false]);
