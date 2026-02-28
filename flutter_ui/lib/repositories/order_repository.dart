@@ -17,16 +17,17 @@ class OrderRepository {
   Future<List<Map<String, dynamic>>> getOrders({
     String? status,
     String? date,
+    bool? discrepancy,
+    bool? deletedItem,
     bool forceRefresh = false,
   }) async {
-    final local = await _queryLocalOrders(status: status, date: date);
+    final local = await _queryLocalOrders(status: status, date: date, discrepancy: discrepancy, deletedItem: deletedItem);
     if (local.isNotEmpty && !forceRefresh) {
-      // Fire-and-forget refresh; UI dùng dữ liệu cache ngay lập tức.
-      _refreshOrders(status: status, date: date);
+      _refreshOrders(status: status, date: date, discrepancy: discrepancy, deletedItem: deletedItem);
       return Future.wait(local.map(_attachItems));
     }
     try {
-      return await _refreshOrders(status: status, date: date);
+      return await _refreshOrders(status: status, date: date, discrepancy: discrepancy, deletedItem: deletedItem);
     } catch (e) {
       if (local.isNotEmpty) return Future.wait(local.map(_attachItems));
       rethrow;
@@ -49,7 +50,12 @@ class OrderRepository {
     ];
   }
 
-  Future<List<Map<String, dynamic>>> _queryLocalOrders({String? status, String? date}) async {
+  Future<List<Map<String, dynamic>>> _queryLocalOrders({
+    String? status,
+    String? date,
+    bool? discrepancy,
+    bool? deletedItem,
+  }) async {
     String? where;
     List<Object?> whereArgs = [];
     if (status != null) {
@@ -67,6 +73,14 @@ class OrderRepository {
         whereArgs.addAll(bounds);
       }
     }
+    if (discrepancy == true) {
+      where = where != null
+          ? '$where AND (COALESCE(total_all, 0) - COALESCE(highest_total, 0)) != 0'
+          : '(COALESCE(total_all, 0) - COALESCE(highest_total, 0)) != 0';
+    }
+    if (deletedItem == true) {
+      where = where != null ? '$where AND is_deleted_item = 1' : 'is_deleted_item = 1';
+    }
     if (where != null) {
       return _db.queryWhere('orders',
           where: where, whereArgs: whereArgs, orderBy: 'id DESC');
@@ -77,10 +91,14 @@ class OrderRepository {
   Future<List<Map<String, dynamic>>> _refreshOrders({
     String? status,
     String? date,
+    bool? discrepancy,
+    bool? deletedItem,
   }) async {
     final params = <String, dynamic>{};
     if (status != null) params['status'] = status;
     if (date != null) params['date'] = date;
+    if (discrepancy == true) params['discrepancy'] = 1;
+    if (deletedItem == true) params['deleted_item'] = 1;
     final res = await _api.get(ApiConfig.orders, queryParameters: params);
     final raw = res.data is Map ? res.data['data'] : res.data;
     final data = List<Map<String, dynamic>>.from(raw);
@@ -206,6 +224,10 @@ class OrderRepository {
     await _api.put('${ApiConfig.orders}/$orderId/pay-items', data: {
       'items': items,
     });
+  }
+
+  Future<void> recordPrint(int orderId) async {
+    await _api.post('${ApiConfig.orders}/$orderId/record-print');
   }
 
   Future<void> mergeTables(int sourceTableId, int targetTableId) async {

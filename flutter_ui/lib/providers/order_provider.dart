@@ -187,16 +187,24 @@ class OrderNotifier extends StateNotifier<OrderState> {
     }
   }
 
-  Future<void> loadOrders({String? status, String? date}) async {
+  Future<void> loadOrders({String? status, String? date, bool? discrepancy, bool? deletedItem}) async {
     if (!mounted) return;
     state = state.copyWith(isLoading: true);
     try {
-      final data = await _repo.getOrders(status: status, date: date);
+      final data = await _repo.getOrders(status: status, date: date, discrepancy: discrepancy, deletedItem: deletedItem);
       if (!mounted) return;
       state = state.copyWith(orders: data, isLoading: false);
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<void> recordPrint(int orderId) async {
+    try {
+      await _repo.recordPrint(orderId);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
     }
   }
 
@@ -302,7 +310,12 @@ class OrderNotifier extends StateNotifier<OrderState> {
     try {
       await _repo.updateStatus(orderId, status);
       await loadActiveOrders();
-      await loadOrders(status: statusFilter, date: date);
+      await loadOrders(
+        status: (statusFilter == 'discrepancy' || statusFilter == 'deleted_item') ? null : statusFilter,
+        date: date,
+        discrepancy: statusFilter == 'discrepancy',
+        deletedItem: statusFilter == 'deleted_item',
+      );
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -312,7 +325,12 @@ class OrderNotifier extends StateNotifier<OrderState> {
     try {
       await _repo.payItems(orderId, itemIds);
       await loadActiveOrders();
-      await loadOrders(status: statusFilter, date: date);
+      await loadOrders(
+        status: (statusFilter == 'discrepancy' || statusFilter == 'deleted_item') ? null : statusFilter,
+        date: date,
+        discrepancy: statusFilter == 'discrepancy',
+        deletedItem: statusFilter == 'deleted_item',
+      );
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -327,7 +345,12 @@ class OrderNotifier extends StateNotifier<OrderState> {
     try {
       await _repo.payItemsWithQuantities(orderId, items);
       await loadActiveOrders();
-      await loadOrders(status: statusFilter, date: date);
+      await loadOrders(
+        status: (statusFilter == 'discrepancy' || statusFilter == 'deleted_item') ? null : statusFilter,
+        date: date,
+        discrepancy: statusFilter == 'discrepancy',
+        deletedItem: statusFilter == 'deleted_item',
+      );
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }

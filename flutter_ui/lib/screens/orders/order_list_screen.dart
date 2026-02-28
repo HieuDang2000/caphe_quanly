@@ -31,7 +31,12 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     _selectedDate = _todayVietnam();
     Future.microtask(() {
       ref.read(orderProvider.notifier).startPolling();
-      ref.read(orderProvider.notifier).loadOrders(status: _statusFilter, date: _selectedDate);
+      ref.read(orderProvider.notifier).loadOrders(
+            status: (_statusFilter == 'discrepancy' || _statusFilter == 'deleted_item') ? null : _statusFilter,
+            date: _selectedDate,
+            discrepancy: _statusFilter == 'discrepancy',
+            deletedItem: _statusFilter == 'deleted_item',
+          );
     });
   }
 
@@ -63,7 +68,12 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     if (picked == null || !mounted) return;
     final dateStr = '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
     setState(() => _selectedDate = dateStr);
-    ref.read(orderProvider.notifier).loadOrders(status: _statusFilter, date: dateStr);
+    ref.read(orderProvider.notifier).loadOrders(
+          status: (_statusFilter == 'discrepancy' || _statusFilter == 'deleted_item') ? null : _statusFilter,
+          date: dateStr,
+          discrepancy: _statusFilter == 'discrepancy',
+          deletedItem: _statusFilter == 'deleted_item',
+        );
   }
 
   @override
@@ -84,12 +94,19 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             icon: const Icon(Icons.filter_list),
             onSelected: (status) {
               setState(() => _statusFilter = status);
-              ref.read(orderProvider.notifier).loadOrders(status: status, date: _selectedDate);
+              ref.read(orderProvider.notifier).loadOrders(
+                    status: (status == 'discrepancy' || status == 'deleted_item') ? null : status,
+                    date: _selectedDate,
+                    discrepancy: status == 'discrepancy',
+                    deletedItem: status == 'deleted_item',
+                  );
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: null, child: Text('Tất cả')),
               const PopupMenuItem(value: 'pending', child: Text('Đang chờ')),
               const PopupMenuItem(value: 'paid', child: Text('Đã thanh toán')),
+              const PopupMenuItem(value: 'discrepancy', child: Text('Đơn lệch tiền')),
+              const PopupMenuItem(value: 'deleted_item', child: Text('Đơn hàng có món bị xóa')),
             ],
           ),
         ],
@@ -126,7 +143,12 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             child: orderState.isLoading
                 ? const LoadingWidget()
                 : RefreshIndicator(
-                    onRefresh: () => ref.read(orderProvider.notifier).loadOrders(status: _statusFilter, date: _selectedDate),
+                    onRefresh: () => ref.read(orderProvider.notifier).loadOrders(
+                          status: (_statusFilter == 'discrepancy' || _statusFilter == 'deleted_item') ? null : _statusFilter,
+                          date: _selectedDate,
+                          discrepancy: _statusFilter == 'discrepancy',
+                          deletedItem: _statusFilter == 'deleted_item',
+                        ),
                     child: orderState.orders.isEmpty
                   ? const Center(child: Text('Chưa có đơn hàng'))
                   : Align(
@@ -188,8 +210,17 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                     ),
                                     const Spacer(),
                                     Text(Formatters.currency(order['total'] ?? 0), style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+                                    if (order['highest_total'] != null && Formatters.toNum(order['highest_total']) > 0)
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 4),
+                                      child: Text(
+                                        'Ước tính: ${Formatters.currency(order['highest_total'])}',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                      ),
+                                    ),
                                   ],
                                 ),
+                                
                               ],
                             ),
                             children: [
@@ -258,6 +289,46 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                   secondary: Text('x${item['quantity']} - ${Formatters.currency(item['subtotal'] ?? 0)}'),
                                 );
                               }),
+                              ExpansionTile(
+                                initiallyExpanded: false,
+                                title: Text(
+                                  'Lịch sử thao tác',
+                                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                                ),
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: () {
+                                        final historyStr = order['order_history'] as String? ?? '';
+                                        final entries = historyStr
+                                            .split(';')
+                                            .map((s) => s.trim())
+                                            .where((s) => s.isNotEmpty)
+                                            .toList();
+                                        if (entries.isEmpty) {
+                                          return [
+                                            Text('Chưa có thao tác', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                          ];
+                                        }
+                                        return entries
+                                            .map((e) => Padding(
+                                                  padding: const EdgeInsets.symmetric(vertical: 2),
+                                                  child: Row(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text('• ', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                                      Expanded(child: Text(e, style: const TextStyle(fontSize: 12))),
+                                                    ],
+                                                  ),
+                                                ))
+                                            .toList();
+                                      }(),
+                                    ),
+                                  ),
+                                ],
+                              ),
                               Padding(
                                 padding: const EdgeInsets.all(12),
                                 child: Row(
@@ -338,6 +409,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                         };
 
                                         await ReceiptPrinter.print80mm(invoice: invoice);
+                                        await ref.read(orderProvider.notifier).recordPrint(orderId);
                                       },
                                       icon: const Icon(Icons.print),
                                       label: const Text('In hóa đơn'),

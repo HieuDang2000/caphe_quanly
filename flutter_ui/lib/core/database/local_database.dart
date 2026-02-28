@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common/sqlite_api.dart';
 import 'database_factory_io.dart' if (dart.library.html) 'database_factory_web.dart' as db_factory;
 
-const _dbVersion = 2;
+const _dbVersion = 5;
 
 String _jsonEncode(dynamic value) => convert.jsonEncode(value);
 dynamic _jsonDecode(String value) => convert.jsonDecode(value);
@@ -116,7 +116,11 @@ class LocalDatabase {
         tax REAL DEFAULT 0,
         discount REAL DEFAULT 0,
         total REAL DEFAULT 0,
+        total_all REAL DEFAULT 0,
+        highest_total REAL,
         notes TEXT,
+        order_history TEXT,
+        is_deleted_item INTEGER DEFAULT 0,
         created_at TEXT,
         updated_at TEXT
       )
@@ -198,6 +202,27 @@ class LocalDatabase {
           last_synced_at TEXT
         )
       ''');
+    }
+    // v3: orders.total_all, orders.highest_total
+    if (oldVersion < 3) {
+      try {
+        await db.execute('ALTER TABLE orders ADD COLUMN total_all REAL DEFAULT 0');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE orders ADD COLUMN highest_total REAL');
+      } catch (_) {}
+    }
+    // v4: orders.order_history
+    if (oldVersion < 4) {
+      try {
+        await db.execute('ALTER TABLE orders ADD COLUMN order_history TEXT');
+      } catch (_) {}
+    }
+    // v5: orders.is_deleted_item
+    if (oldVersion < 5) {
+      try {
+        await db.execute('ALTER TABLE orders ADD COLUMN is_deleted_item INTEGER DEFAULT 0');
+      } catch (_) {}
     }
   }
 
@@ -291,14 +316,14 @@ class LocalDatabase {
     'menu_item_options': {'id', 'menu_item_id', 'name', 'extra_price', 'created_at', 'updated_at'},
     'floors': {'id', 'name', 'floor_number', 'is_active', 'created_at', 'updated_at'},
     'layout_objects': {'id', 'floor_id', 'type', 'name', 'position_x', 'position_y', 'width', 'height', 'rotation', 'properties', 'is_active', 'created_at', 'updated_at'},
-    'orders': {'id', 'user_id', 'customer_id', 'table_id', 'order_number', 'status', 'subtotal', 'tax', 'discount', 'total', 'notes', 'created_at', 'updated_at'},
+    'orders': {'id', 'user_id', 'customer_id', 'table_id', 'order_number', 'status', 'subtotal', 'tax', 'discount', 'total', 'total_all', 'highest_total', 'notes', 'order_history', 'is_deleted_item', 'created_at', 'updated_at'},
     'order_items': {'id', 'order_id', 'menu_item_id', 'quantity', 'unit_price', 'subtotal', 'notes', 'options', 'is_paid', 'created_at', 'updated_at'},
     'invoices': {'id', 'order_id', 'invoice_number', 'subtotal', 'tax_rate', 'tax_amount', 'discount_amount', 'total', 'payment_status', 'created_at', 'updated_at'},
     'payments': {'id', 'invoice_id', 'amount', 'payment_method', 'reference_number', 'paid_at', 'created_at', 'updated_at'},
   };
 
   static const _jsonColumns = {'properties', 'options'};
-  static const _boolColumns = {'is_active', 'is_available', 'is_paid'};
+  static const _boolColumns = {'is_active', 'is_available', 'is_paid', 'is_deleted_item'};
 
   Map<String, dynamic> _sanitize(String table, Map<String, dynamic> row) {
     final allowed = _tableColumns[table];

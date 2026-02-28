@@ -12,7 +12,7 @@ class OrderService
     public function createOrder(array $data, int $userId): Order
     {
         $tableId = $data['table_id'] ?? null;
-        if ($tableId !== null && !empty($data['items'])) {
+        if ($tableId !== null && ! empty($data['items'])) {
             $existingOrder = $this->findActiveOrderForTable((int) $tableId);
             if ($existingOrder !== null) {
                 $this->addItemsToOrder($existingOrder, $data['items'], $userId);
@@ -30,8 +30,12 @@ class OrderService
             'discount' => $data['discount'] ?? 0,
         ]);
 
-        if (!empty($data['items'])) {
+        if (! empty($data['items'])) {
             $this->syncItems($order, $data['items']);
+            $names = $this->getOrderItemNamesSummary($order);
+            $order->appendHistory($names !== '' ? 'Tạo đơn: ' . $names : 'Tạo đơn');
+        } else {
+            $order->appendHistory('Tạo đơn');
         }
 
         $order->recalculate();
@@ -50,10 +54,15 @@ class OrderService
 
     public function addItemsToOrder(Order $order, array $items, int $userId): Order
     {
+        $names = [];
         foreach ($items as $itemData) {
             [$unitPrice, $optionsSnapshot] = $this->resolveUnitPriceAndOptions($itemData);
             $quantity = (int) ($itemData['quantity'] ?? 1);
             $subtotal = $unitPrice * $quantity;
+
+            $menuItem = MenuItem::find($itemData['menu_item_id']);
+            $name = $menuItem ? trim((string) $menuItem->name) : ('Món #' . $itemData['menu_item_id']);
+            $names[] = $name . ' x' . $quantity;
 
             OrderItem::create([
                 'order_id' => $order->id,
@@ -66,6 +75,7 @@ class OrderService
             ]);
         }
 
+        $order->appendHistory($names !== [] ? 'Thêm món: ' . implode(', ', $names) : 'Thêm món');
         $order->recalculate();
         $order->load(['items.menuItem', 'table', 'user', 'customer']);
 
@@ -103,6 +113,7 @@ class OrderService
         if ($targetOrder === null) {
             foreach ($sourceOrders as $order) {
                 $order->update(['table_id' => $targetTableId]);
+                $order->appendHistory('Chuyển bàn');
             }
             return;
         }
@@ -132,8 +143,10 @@ class OrderService
                 'status' => 'cancelled',
                 'table_id' => null,
             ]);
+            $order->appendHistory('Đã gộp vào bàn khác');
         }
 
+        $targetOrder->appendHistory('Gộp bàn');
         $targetOrder->recalculate();
     }
 
@@ -156,12 +169,17 @@ class OrderService
 
             /** @var Order $order */
             $order->update(['table_id' => $targetTableId]);
+            $order->appendHistory('Chuyển bàn');
             return;
         }
 
-        Order::where('table_id', $sourceTableId)
+        $orders = Order::where('table_id', $sourceTableId)
             ->where('status', 'pending')
-            ->update(['table_id' => $targetTableId]);
+            ->get();
+        foreach ($orders as $order) {
+            $order->update(['table_id' => $targetTableId]);
+            $order->appendHistory('Chuyển bàn');
+        }
     }
 
     public function updateOrder(Order $order, array $data, int $userId): Order
@@ -169,9 +187,47 @@ class OrderService
         $order->update(collect($data)->only(['customer_id', 'table_id', 'notes', 'discount'])->toArray());
 
         if (isset($data['items'])) {
-            // Chỉ thay thế các item chưa thanh toán; giữ nguyên lịch sử các item đã is_paid = true
+            $unpaidItems = $order->items()->where('is_paid', false)->with('menuItem')->get();
+            $oldCounts = []; // menu_item_id => total quantity
+            foreach ($unpaidItems as $i) {
+                $oldCounts[$i->menu_item_id] = ($oldCounts[$i->menu_item_id] ?? 0) + $i->quantity;
+            }
+            $newCounts = [];
+            foreach ($data['items'] as $item) {
+                $id = (int) ($item['menu_item_id'] ?? 0);
+                $qty = (int) ($item['quantity'] ?? 1);
+                $newCounts[$id] = ($newCounts[$id] ?? 0) + $qty;
+            }
+            $allIds = array_unique(array_merge(array_keys($oldCounts), array_keys($newCounts)));
+            $namesById = MenuItem::whereIn('id', $allIds)->pluck('name', 'id')->map(fn ($n) => trim((string) $n))->toArray();
+
+            $removedParts = [];
+            $addedParts = [];
+            foreach ($allIds as $id) {
+                $oldQty = $oldCounts[$id] ?? 0;
+                $newQty = $newCounts[$id] ?? 0;
+                $name = $namesById[$id] ?? ('Món #' . $id);
+                if ($oldQty > $newQty) {
+                    $removedParts[] = $name . ' x' . ($oldQty - $newQty);
+                }
+                if ($newQty > $oldQty) {
+                    $addedParts[] = $name . ' x' . ($newQty - $oldQty);
+                }
+            }
+
             $order->items()->where('is_paid', false)->delete();
             $this->syncItems($order, $data['items']);
+
+            if ($removedParts !== []) {
+                $order->appendHistory('Xóa món: ' . implode(', ', $removedParts));
+                $order->update(['is_deleted_item' => true]);
+            }
+            if ($addedParts !== []) {
+                $order->appendHistory('Thêm món: ' . implode(', ', $addedParts));
+            }
+            if ($removedParts === [] && $addedParts === []) {
+                $order->appendHistory('Sửa món');
+            }
         }
 
         $order->recalculate();
@@ -238,5 +294,40 @@ class OrderService
         $date = now()->format('Ymd');
         $count = Order::whereDate('created_at', today())->count() + 1;
         return "ORD-{$date}-" . str_pad($count, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Tóm tắt tên món + số lượng từ các item hiện có của order (vd: "Cà phê đen x2, Bánh mì x1").
+     */
+    protected function getOrderItemNamesSummary(Order $order): string
+    {
+        $items = $order->items()->with('menuItem')->get();
+        $parts = $items->map(function ($i) {
+            $name = $i->menuItem ? trim((string) $i->menuItem->name) : ('Món #' . $i->menu_item_id);
+            return $name . ' x' . $i->quantity;
+        });
+
+        return $parts->join(', ');
+    }
+
+    /**
+     * Từ payload items (menu_item_id, quantity) trả về chuỗi "Tên x qty, ...".
+     */
+    protected function getItemNamesFromPayload(array $items): string
+    {
+        if (empty($items)) {
+            return '';
+        }
+        $ids = array_unique(array_column($items, 'menu_item_id'));
+        $namesById = MenuItem::whereIn('id', $ids)->pluck('name', 'id')->map(fn ($n) => trim((string) $n))->toArray();
+        $parts = [];
+        foreach ($items as $item) {
+            $id = $item['menu_item_id'] ?? null;
+            $qty = (int) ($item['quantity'] ?? 1);
+            $name = $namesById[$id] ?? ('Món #' . $id);
+            $parts[] = $name . ' x' . $qty;
+        }
+
+        return implode(', ', $parts);
     }
 }

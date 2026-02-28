@@ -19,8 +19,6 @@ class OrderCartBar extends ConsumerStatefulWidget {
 class _OrderCartBarState extends ConsumerState<OrderCartBar> {
   bool _expanded = true;
   int? _lastOrderId;
-  final Set<int> _selectedTableItemIds = {};
-  final Set<int> _selectedItemIdsForInvoice = {};
   final Set<int> _deletingTableItemIds = {};
 
   @override
@@ -40,8 +38,6 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
         if (mounted) {
           setState(() {
             _lastOrderId = orderId;
-            _selectedTableItemIds.clear();
-            _selectedItemIdsForInvoice.clear();
           });
         }
       });
@@ -227,8 +223,6 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                           : null;
                       final hasNote = note != null && note.trim().isNotEmpty;
                       final isItemPaid = item['is_paid'] == true;
-                      final canSelect = orderStatus == 'pending' && itemId != null && !isItemPaid;
-                      final isSelected = canSelect && _selectedTableItemIds.contains(itemId);
                       final paidStyle = TextStyle(
                         fontWeight: FontWeight.w600,
                         color: Colors.grey.shade600,
@@ -242,51 +236,18 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                         decorationColor: Colors.grey.shade500,
                         fontStyle: hasNote ? FontStyle.italic : FontStyle.normal,
                       );
-                      final isSelectedForInvoice = itemId != null && _selectedItemIdsForInvoice.contains(itemId);
                       final isDeleting = itemId != null && _deletingTableItemIds.contains(itemId);
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 4),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(4),
-                          side: isSelectedForInvoice ? BorderSide(color: AppTheme.primaryColor, width: 1.5) : BorderSide.none,
                         ),
-                        child: InkWell(
-                          onTap: itemId != null
-                              ? () => setState(() {
-                                    if (_selectedItemIdsForInvoice.contains(itemId)) {
-                                      _selectedItemIdsForInvoice.remove(itemId);
-                                    } else {
-                                      _selectedItemIdsForInvoice.add(itemId);
-                                    }
-                                  })
-                              : null,
-                          borderRadius: BorderRadius.circular(4),
-                          child: ListTile(
+                        child: ListTile(
                           dense: true,
-                          leading: canSelect
-                              ? Checkbox(
-                                  value: isSelected,
-                                  onChanged: (v) => setState(() {
-                                    if (v == true) {
-                                      _selectedTableItemIds.add(itemId);
-                                    } else {
-                                      _selectedTableItemIds.remove(itemId);
-                                    }
-                                  }),
-                                )
-                              : null,
-                          title: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  item['menu_item']?['name']?.toString() ?? (item['name']?.toString() ?? ''),
-                                  style: isItemPaid ? paidStyle : const TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                              if (isSelectedForInvoice)
-                                Icon(Icons.check_circle, size: 18, color: AppTheme.primaryColor),
-                            ],
+                          title: Text(
+                            item['menu_item']?['name']?.toString() ?? (item['name']?.toString() ?? ''),
+                            style: isItemPaid ? paidStyle : const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,7 +316,6 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                               ],
                             ],
                           ),
-                        ),
                         ),
                       );
                     } else {
@@ -492,52 +452,29 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                           final currentOrder = ref.read(orderProvider).currentOrder;
                           if (currentOrder == null) return;
 
-                          // Không chọn item nào => in toàn bộ item trong order.
-                          if (_selectedItemIdsForInvoice.isEmpty) {
-                            final orderItems =
-                                (currentOrder['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-                            if (orderItems.isEmpty) return;
-                            final subtotal = orderItems.fold<double>(
-                              0,
-                              (s, i) => s + Formatters.toNum(i['subtotal']),
-                            );
-                            final fullOrder = Map<String, dynamic>.from(currentOrder);
-                            fullOrder['items'] = orderItems;
-                            final invoice = <String, dynamic>{
-                              'invoice_number': currentOrder['invoice']?['invoice_number'] ??
-                                  '${currentOrder['order_number'] ?? ''}',
-                              'created_at': currentOrder['invoice']?['created_at'] ??
-                                  DateTime.now().toIso8601String(),
-                              'subtotal': subtotal,
-                              'total': subtotal,
-                              'discount_amount': 0,
-                              'order': fullOrder,
-                            };
-                            await ReceiptPrinter.print80mm(invoice: invoice);
-                          } else {
-                            final orderItems =
-                                (currentOrder['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-                            final selectedItems = orderItems
-                                .where((i) => _selectedItemIdsForInvoice.contains(i['id']))
-                                .toList();
-                            if (selectedItems.isEmpty) return;
-                            final partialSubtotal = selectedItems.fold<double>(
-                              0,
-                              (s, i) => s + Formatters.toNum(i['subtotal']),
-                            );
-                            final partialOrder = Map<String, dynamic>.from(currentOrder);
-                            partialOrder['items'] = selectedItems;
-                            final partialInvoice = <String, dynamic>{
-                              'invoice_number': currentOrder['invoice']?['invoice_number'] ??
-                                  '${currentOrder['order_number'] ?? ''}-partial',
-                              'created_at': currentOrder['invoice']?['created_at'] ??
-                                  DateTime.now().toIso8601String(),
-                              'subtotal': partialSubtotal,
-                              'total': partialSubtotal,
-                              'discount_amount': 0,
-                              'order': partialOrder,
-                            };
-                            await ReceiptPrinter.print80mm(invoice: partialInvoice);
+                          final orderItems =
+                              (currentOrder['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+                          if (orderItems.isEmpty) return;
+                          final subtotal = orderItems.fold<double>(
+                            0,
+                            (s, i) => s + Formatters.toNum(i['subtotal']),
+                          );
+                          final fullOrder = Map<String, dynamic>.from(currentOrder);
+                          fullOrder['items'] = orderItems;
+                          final invoice = <String, dynamic>{
+                            'invoice_number': currentOrder['invoice']?['invoice_number'] ??
+                                '${currentOrder['order_number'] ?? ''}',
+                            'created_at': currentOrder['invoice']?['created_at'] ??
+                                DateTime.now().toIso8601String(),
+                            'subtotal': subtotal,
+                            'total': subtotal,
+                            'discount_amount': 0,
+                            'order': fullOrder,
+                          };
+                          await ReceiptPrinter.print80mm(invoice: invoice);
+                          final oid = currentOrder['id'] as int?;
+                          if (oid != null) {
+                            await ref.read(orderProvider.notifier).recordPrint(oid);
                           }
                         },
                         icon: const Icon(Icons.print, size: 22),
@@ -550,7 +487,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                             await ref.read(orderProvider.notifier).updateStatus(orderId, 'paid');
                             if (!mounted) return;
                             ref.read(orderProvider.notifier).clearCurrentOrder();
-                            if (mounted) setState(() => _selectedTableItemIds.clear());
+                            if (mounted) setState(() {});
                           },
                           child: const Text('Thanh toán toàn bộ'),
                         ),
@@ -578,7 +515,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                             if (tableId != null) {
                               await ref.read(orderProvider.notifier).loadTableActiveOrder(tableId);
                             }
-                            if (mounted) setState(() => _selectedTableItemIds.clear());
+                            if (mounted) setState(() {});
                           },
                           child: const Text('Về chờ xử lý'),
                         ),
@@ -823,16 +760,13 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
           'order': partialOrder,
         };
         await ReceiptPrinter.print80mm(invoice: partialInvoice);
+        await ref.read(orderProvider.notifier).recordPrint(orderId);
       }
     }
 
     await ref.read(orderProvider.notifier).payItemsWithQuantities(orderId, itemsToPay);
     await ref.read(orderProvider.notifier).loadOrderById(orderId);
-    if (mounted) {
-      setState(() {
-        _selectedTableItemIds.clear();
-      });
-    }
+    if (mounted) setState(() {});
   }
 
   void _openBottomSheet(BuildContext context) {

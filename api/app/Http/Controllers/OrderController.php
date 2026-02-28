@@ -31,6 +31,14 @@ class OrderController extends Controller
             $query->where('table_id', $request->table_id);
         }
 
+        if ($request->filled('discrepancy')) {
+            $query->whereRaw('(total_all - COALESCE(highest_total, 0)) != 0');
+        }
+
+        if ($request->filled('deleted_item')) {
+            $query->where('is_deleted_item', true);
+        }
+
         $orders = $query->orderByDesc('created_at')->paginate($request->get('per_page', 20));
         return response()->json($orders);
     }
@@ -53,6 +61,19 @@ class OrderController extends Controller
 
         $order = $this->orderService->createOrder($request->all(), auth('api')->id());
         return response()->json($order, 201);
+    }
+
+    public function recordPrint(int $id): JsonResponse
+    {
+        $order = Order::with('items')->findOrFail($id);
+        $totalAtPrint = $order->items->sum('subtotal') - $order->discount;
+        $order->appendHistory('In: ' . (int) $totalAtPrint);
+        $currentHighest = $order->highest_total ?? 0;
+        if ($totalAtPrint > $currentHighest) {
+            $order->update(['highest_total' => $totalAtPrint]);
+        }
+        $order->load(['items.menuItem', 'table', 'user', 'customer', 'invoice']);
+        return response()->json($order);
     }
 
     public function show(int $id): JsonResponse
@@ -81,7 +102,16 @@ class OrderController extends Controller
 
         $order = Order::findOrFail($id);
         $newStatus = $request->status;
+        $totalAll = (int) ($order->total_all ?? 0);
         $order->update(['status' => $newStatus]);
+
+        if ($newStatus === 'paid') {
+            $order->appendHistory('Thanh toán toàn bộ: ' . $totalAll);
+        } elseif ($newStatus === 'pending') {
+            $order->appendHistory('Về chờ xử lý: ' . $totalAll);
+        } elseif ($newStatus === 'cancelled') {
+            $order->appendHistory('Hủy đơn: ' . $totalAll);
+        }
 
         // Chỉ reset is_paid khi đưa đơn về trạng thái pending.
         // Khi thanh toán toàn bộ (status = paid) thì không thay đổi is_paid
@@ -154,6 +184,8 @@ class OrderController extends Controller
                 }
             }
 
+            $totalAll = (int) ($order->total_all ?? 0);
+            $order->appendHistory('Thanh toán một phần: ' . $totalAll);
             // Tính lại tổng tiền và trạng thái đơn.
             $order->recalculate();
             $order->refresh()->load(['items.menuItem', 'table', 'user']);
@@ -175,7 +207,8 @@ class OrderController extends Controller
         }
 
         $order = Order::with('items')->findOrFail($id);
-
+        $totalAll = (int) ($order->total_all ?? 0);
+        $order->appendHistory('Thanh toán một phần: ' . $totalAll);
         $order->items()
             ->whereIn('id', $request->input('item_ids', []))
             ->update(['is_paid' => true]);
@@ -240,6 +273,7 @@ class OrderController extends Controller
             ->get();
 
         foreach ($orders as $order) {
+            $order->appendHistory('Xóa đơn của bàn');
             $order->update([
                 'status' => 'cancelled',
                 // 'table_id' => null,

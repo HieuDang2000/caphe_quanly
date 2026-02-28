@@ -73,6 +73,7 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/active-tables', [OrderController::class, 'activeTables']);
         Route::get('/table/{tableId}', [OrderController::class, 'tableOrders']);
         Route::delete('/table/{tableId}', [OrderController::class, 'clearTableOrders']);
+        Route::post('/{id}/record-print', [OrderController::class, 'recordPrint']);
         Route::get('/{id}', [OrderController::class, 'show']);
         Route::put('/{id}', [OrderController::class, 'update']);
         Route::put('/{id}/status', [OrderController::class, 'updateStatus']);

@@ -10,8 +10,20 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Order extends Model
 {
     protected $fillable = [
-        'user_id', 'customer_id', 'table_id', 'order_number',
-        'status', 'subtotal', 'tax', 'discount', 'total', 'notes',
+        'user_id',
+        'customer_id',
+        'table_id',
+        'order_number',
+        'status',
+        'subtotal',
+        'tax',
+        'discount',
+        'total',
+        'total_all',
+        'highest_total',
+        'notes',
+        'order_history',
+        'is_deleted_item',
     ];
 
     protected function casts(): array
@@ -21,6 +33,9 @@ class Order extends Model
             'tax' => 'decimal:0',
             'discount' => 'decimal:0',
             'total' => 'decimal:0',
+            'total_all' => 'decimal:0',
+            'highest_total' => 'decimal:0',
+            'is_deleted_item' => 'boolean',
         ];
     }
 
@@ -57,6 +72,30 @@ class Order extends Model
             ->sum('subtotal');
         $tax = 0;
         $total = $subtotal - $this->discount;
-        $this->update(compact('subtotal', 'tax', 'total'));
+
+        // total_all = tổng tất cả item (kể cả đã thanh toán) - discount; không bị trừ khi thanh toán một phần
+        $subtotalAll = $this->items()->sum('subtotal');
+        $totalAll = $subtotalAll - $this->discount;
+
+        $this->update([
+            'subtotal' => $subtotal,
+            'tax' => $tax,
+            'total' => $total,
+            'total_all' => $totalAll,
+        ]);
+    }
+
+    /**
+     * Thêm một dòng vào order_history (phân cách bằng dấu ; giữa các thao tác).
+     */
+    public function appendHistory(string $entry): void
+    {
+        $entry = str_replace(';', ' ', trim($entry));
+        if ($entry === '') {
+            return;
+        }
+        $current = $this->order_history ?? '';
+        $new = $current === '' ? $entry : $current . ';' . $entry;
+        $this->update(['order_history' => $new]);
     }
 }
