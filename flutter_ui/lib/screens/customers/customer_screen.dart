@@ -1,80 +1,99 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../config/app_theme.dart';
-import '../../core/network/api_client.dart';
-import '../../config/api_config.dart';
+import '../../providers/customer_provider.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/responsive_layout.dart';
-
-final customerListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final api = ref.watch(apiClientProvider);
-  final res = await api.get(ApiConfig.customers);
-  return List<Map<String, dynamic>>.from(res.data);
-});
 
 class CustomerScreen extends ConsumerWidget {
   const CustomerScreen({super.key});
 
   Color _tierColor(String tier) {
     switch (tier) {
-      case 'platinum': return Colors.purple;
-      case 'gold': return Colors.amber;
-      case 'silver': return Colors.grey;
-      default: return AppTheme.primaryColor;
+      case 'platinum':
+        return Colors.purple;
+      case 'gold':
+        return Colors.amber;
+      case 'silver':
+        return Colors.grey;
+      default:
+        return AppTheme.primaryColor;
     }
   }
 
   String _tierLabel(String tier) {
     switch (tier) {
-      case 'platinum': return 'Bạch kim';
-      case 'gold': return 'Vàng';
-      case 'silver': return 'Bạc';
-      default: return 'Thường';
+      case 'platinum':
+        return 'Bạch kim';
+      case 'gold':
+        return 'Vàng';
+      case 'silver':
+        return 'Bạc';
+      default:
+        return 'Thường';
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final customersAsync = ref.watch(customerListProvider);
+    final state = ref.watch(customerProvider);
     final mobile = isMobile(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Khách hàng thân thiết')),
+      appBar: AppBar(
+        title: const Text('Khách hàng thân thiết'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => ref.read(customerProvider.notifier).load(),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addCustomerDialog(context, ref),
         child: const Icon(Icons.person_add),
       ),
-      body: customersAsync.when(
-        loading: () => const LoadingWidget(),
-        error: (e, _) => Center(child: Text('Lỗi: $e')),
-        data: (customers) => ListView.builder(
-          padding: EdgeInsets.all(mobile ? 8 : 12),
-          itemCount: customers.length,
-          itemBuilder: (_, index) {
-            final c = customers[index];
-            final tier = c['tier'] as String? ?? 'regular';
-            return Card(
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: _tierColor(tier).withValues(alpha: 0.15),
-                  child: Icon(Icons.person, color: _tierColor(tier)),
+      body: state.isLoading
+          ? const LoadingWidget()
+          : state.error != null
+              ? Center(child: Text('Lỗi: ${state.error}'))
+              : RefreshIndicator(
+                  onRefresh: () => ref.read(customerProvider.notifier).load(),
+                  child: ListView.builder(
+                    padding: EdgeInsets.all(mobile ? 8 : 12),
+                    itemCount: state.customers.length,
+                    itemBuilder: (_, index) {
+                      final c = state.customers[index];
+                      final tier = c['tier'] as String? ?? 'regular';
+                      return Card(
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: _tierColor(tier).withValues(alpha: 0.15),
+                            child: Icon(Icons.person, color: _tierColor(tier)),
+                          ),
+                          title: Text(c['name'] ?? '',
+                              style: const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle:
+                              Text('${c['phone'] ?? '-'} • ${_tierLabel(tier)}'),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('${c['points'] ?? 0} điểm',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: _tierColor(tier))),
+                              const Text('điểm tích lũy',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey)),
+                            ],
+                          ),
+                          onTap: () => _showCustomerDetail(context, ref, c),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                title: Text(c['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text('${c['phone'] ?? '-'} • ${_tierLabel(tier)}'),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('${c['points'] ?? 0} điểm', style: TextStyle(fontWeight: FontWeight.bold, color: _tierColor(tier))),
-                    const Text('điểm tích lũy', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                  ],
-                ),
-                onTap: () => _showCustomerDetail(context, ref, c),
-              ),
-            );
-          },
-        ),
-      ),
     );
   }
 
@@ -90,26 +109,38 @@ class CustomerScreen extends ConsumerWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Tên')),
+            TextField(
+                controller: nameC,
+                decoration: const InputDecoration(labelText: 'Tên')),
             const SizedBox(height: 12),
-            TextField(controller: phoneC, decoration: const InputDecoration(labelText: 'SĐT'), keyboardType: TextInputType.phone),
+            TextField(
+                controller: phoneC,
+                decoration: const InputDecoration(labelText: 'SĐT'),
+                keyboardType: TextInputType.phone),
             const SizedBox(height: 12),
-            TextField(controller: emailC, decoration: const InputDecoration(labelText: 'Email'), keyboardType: TextInputType.emailAddress),
+            TextField(
+                controller: emailC,
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
           ElevatedButton(
             onPressed: () async {
-              final api = ref.read(apiClientProvider);
-              await api.post(ApiConfig.customers, data: {
-                'name': nameC.text,
-                'phone': phoneC.text.isNotEmpty ? phoneC.text : null,
-                'email': emailC.text.isNotEmpty ? emailC.text : null,
+              if (nameC.text.isEmpty) return;
+              final ok = await ref.read(customerProvider.notifier).create({
+                'name': nameC.text.trim(),
+                'phone': phoneC.text.isNotEmpty ? phoneC.text.trim() : null,
+                'email': emailC.text.isNotEmpty ? emailC.text.trim() : null,
               });
               if (context.mounted) {
                 Navigator.pop(context);
-                ref.invalidate(customerListProvider);
+                if (!ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(ref.read(customerProvider).error ?? 'Lỗi')));
+                }
               }
             },
             child: const Text('Thêm'),
@@ -119,7 +150,8 @@ class CustomerScreen extends ConsumerWidget {
     );
   }
 
-  void _showCustomerDetail(BuildContext context, WidgetRef ref, Map<String, dynamic> customer) {
+  void _showCustomerDetail(
+      BuildContext context, WidgetRef ref, Map<String, dynamic> customer) {
     final pointsC = TextEditingController();
 
     showModalBottomSheet(
@@ -136,37 +168,51 @@ class CustomerScreen extends ConsumerWidget {
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundColor: _tierColor(customer['tier'] ?? 'regular'),
-                    child: const Icon(Icons.person, color: Colors.white, size: 30),
+                    backgroundColor:
+                        _tierColor(customer['tier'] ?? 'regular'),
+                    child: const Icon(Icons.person,
+                        color: Colors.white, size: 30),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(customer['name'] ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        Text('${customer['phone'] ?? '-'} • ${_tierLabel(customer['tier'] ?? 'regular')}'),
-                        Text('${customer['points'] ?? 0} điểm', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(customer['name'] ?? '',
+                            style: const TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(
+                            '${customer['phone'] ?? '-'} • ${_tierLabel(customer['tier'] ?? 'regular')}'),
+                        Text('${customer['points'] ?? 0} điểm',
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              TextField(controller: pointsC, decoration: const InputDecoration(labelText: 'Số điểm'), keyboardType: TextInputType.number),
+              TextField(
+                  controller: pointsC,
+                  decoration: const InputDecoration(labelText: 'Số điểm'),
+                  keyboardType: TextInputType.number),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () async {
-                        final points = int.tryParse(pointsC.text);
-                        if (points == null || points <= 0) return;
-                        final api = ref.read(apiClientProvider);
-                        await api.post('${ApiConfig.customers}/${customer['id']}/points', data: {'points': points});
+                        final pts = int.tryParse(pointsC.text);
+                        if (pts == null || pts <= 0) return;
+                        final ok = await ref
+                            .read(customerProvider.notifier)
+                            .addPoints(customer['id'] as int, pts);
                         if (context.mounted) {
                           Navigator.pop(context);
-                          ref.invalidate(customerListProvider);
+                          if (!ok) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(
+                                    ref.read(customerProvider).error ?? 'Lỗi')));
+                          }
                         }
                       },
                       icon: const Icon(Icons.add),
@@ -177,13 +223,18 @@ class CustomerScreen extends ConsumerWidget {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        final points = int.tryParse(pointsC.text);
-                        if (points == null || points <= 0) return;
-                        final api = ref.read(apiClientProvider);
-                        await api.post('${ApiConfig.customers}/${customer['id']}/redeem', data: {'points': points});
+                        final pts = int.tryParse(pointsC.text);
+                        if (pts == null || pts <= 0) return;
+                        final ok = await ref
+                            .read(customerProvider.notifier)
+                            .redeemPoints(customer['id'] as int, pts);
                         if (context.mounted) {
                           Navigator.pop(context);
-                          ref.invalidate(customerListProvider);
+                          if (!ok) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(
+                                    ref.read(customerProvider).error ?? 'Lỗi')));
+                          }
                         }
                       },
                       icon: const Icon(Icons.redeem),

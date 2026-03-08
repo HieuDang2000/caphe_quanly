@@ -45,10 +45,6 @@ class LayoutNotifier extends StateNotifier<LayoutState> {
       if (floors.isNotEmpty && state.selectedFloorId == null) {
         await selectFloor(floors.first['id']);
       }
-      // Background refresh
-      _repo.getFloors(forceRefresh: true).then((fresh) {
-        if (mounted) state = state.copyWith(floors: fresh);
-      }).catchError((_) {});
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -59,12 +55,6 @@ class LayoutNotifier extends StateNotifier<LayoutState> {
     try {
       final objects = await _repo.getFloorObjects(floorId);
       state = state.copyWith(objects: objects, isLoading: false);
-      // Background refresh
-      _repo.getFloorObjects(floorId, forceRefresh: true).then((fresh) {
-        if (mounted && state.selectedFloorId == floorId) {
-          state = state.copyWith(objects: fresh);
-        }
-      }).catchError((_) {});
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }

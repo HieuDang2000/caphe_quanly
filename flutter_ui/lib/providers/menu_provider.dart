@@ -44,11 +44,6 @@ class MenuNotifier extends StateNotifier<MenuState> {
     try {
       final data = await _repo.getCategories();
       state = state.copyWith(categories: data, isLoading: false);
-      // Background refresh: repo already fires async API call; when we
-      // force-refresh we pick up the latest data.
-      _repo.getCategories(forceRefresh: true).then((fresh) {
-        if (mounted) state = state.copyWith(categories: fresh);
-      }).catchError((_) {});
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -59,9 +54,6 @@ class MenuNotifier extends StateNotifier<MenuState> {
     try {
       final data = await _repo.getItems(categoryId: categoryId);
       state = state.copyWith(items: data, isLoading: false);
-      _repo.getItems(categoryId: categoryId).then((fresh) {
-        if (mounted) state = state.copyWith(items: fresh);
-      }).catchError((_) {});
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -82,17 +74,6 @@ class MenuNotifier extends StateNotifier<MenuState> {
     try {
       await _repo.deleteItem(id);
       state = state.copyWith(items: state.items.where((i) => i['id'] != id).toList());
-      return true;
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-      return false;
-    }
-  }
-
-  Future<bool> uploadImage(int itemId, String filePath) async {
-    try {
-      await _repo.uploadImage(itemId, filePath);
-      await loadItems(categoryId: state.selectedCategoryId);
       return true;
     } catch (e) {
       state = state.copyWith(error: e.toString());

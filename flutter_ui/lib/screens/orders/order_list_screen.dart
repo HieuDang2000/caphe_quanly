@@ -409,7 +409,9 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                         };
 
                                         await ReceiptPrinter.print80mm(invoice: invoice);
-                                        await ref.read(orderProvider.notifier).recordPrint(orderId);
+                                        await ref
+                                            .read(orderProvider.notifier)
+                                            .recordPrint(orderId, subtotal, isPartial: false);
                                       },
                                       icon: const Icon(Icons.print),
                                       label: const Text('In hóa đơn'),

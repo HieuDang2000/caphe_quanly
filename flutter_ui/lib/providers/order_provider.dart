@@ -200,9 +200,9 @@ class OrderNotifier extends StateNotifier<OrderState> {
     }
   }
 
-  Future<void> recordPrint(int orderId) async {
+  Future<void> recordPrint(int orderId, double amount, {bool isPartial = false}) async {
     try {
-      await _repo.recordPrint(orderId);
+      await _repo.recordPrint(orderId, amount, isPartial: isPartial);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/validators.dart';
@@ -103,11 +102,10 @@ class _MenuFormScreenState extends ConsumerState<MenuFormScreen> {
 
   Future<void> _pickImage() async {
     if (!isEditing) return;
-    final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800);
-    if (file != null) {
-      await ref.read(menuProvider.notifier).uploadImage(widget.item!['id'], file.path);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã cập nhật hình ảnh')));
+    // Image upload is handled locally via the item's image path field
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tính năng upload ảnh không khả dụng trong chế độ offline')));
     }
   }
 

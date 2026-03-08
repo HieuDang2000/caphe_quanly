@@ -32,7 +32,7 @@ class InvoiceNotifier extends StateNotifier<InvoiceState> {
   Future<Map<String, dynamic>?> loadInvoice(int id) async {
     state = state.copyWith(isLoading: true);
     try {
-      final invoice = await _repo.getInvoice(id, forceRefresh: true);
+      final invoice = await _repo.getInvoice(id);
       state = InvoiceState(invoice: invoice);
       return invoice;
     } catch (e) {
@@ -56,7 +56,7 @@ class InvoiceNotifier extends StateNotifier<InvoiceState> {
   }
 
   Future<List<int>> downloadInvoicePdf(int invoiceId, {bool receipt80mm = false}) async {
-    return _repo.downloadPdf(invoiceId, receipt80mm: receipt80mm);
+    throw Exception('Tính năng in PDF không khả dụng trong chế độ offline. Vui lòng dùng máy in nhiệt.');
   }
 }
 

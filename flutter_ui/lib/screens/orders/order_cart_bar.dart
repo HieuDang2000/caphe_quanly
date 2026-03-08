@@ -474,7 +474,9 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                           await ReceiptPrinter.print80mm(invoice: invoice);
                           final oid = currentOrder['id'] as int?;
                           if (oid != null) {
-                            await ref.read(orderProvider.notifier).recordPrint(oid);
+                            await ref
+                                .read(orderProvider.notifier)
+                                .recordPrint(oid, subtotal, isPartial: false);
                           }
                         },
                         icon: const Icon(Icons.print, size: 22),
@@ -696,8 +698,10 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                 final itemsToPay = <Map<String, dynamic>>[];
                 quantities.forEach((id, qty) {
                   if (qty > 0) {
+                    // Truyền đúng key 'id' để OrderRepository.payItemsWithQuantities
+                    // nhận được và cập nhật trạng thái is_paid cho order_items.
                     itemsToPay.add({
-                      'item_id': id,
+                      'id': id,
                       'quantity': qty,
                     });
                   }
@@ -718,7 +722,7 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
     // Chuẩn bị dữ liệu in hóa đơn từ lựa chọn hiện tại.
     final qtyByItemId = <int, int>{};
     for (final p in itemsToPay) {
-      final itemId = Formatters.toNum(p['item_id']).toInt();
+      final itemId = Formatters.toNum(p['id']).toInt();
       final qty = Formatters.toNum(p['quantity']).toInt();
       if (itemId > 0 && qty > 0) {
         qtyByItemId[itemId] = (qtyByItemId[itemId] ?? 0) + qty;
@@ -736,11 +740,16 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
         ...it,
         'quantity': payQty,
         'subtotal': unit * payQty,
-        // In trước khi gọi API, nên giữ trạng thái chưa thanh toán.
+        // Trạng thái thực tế sẽ được cập nhật trong DB sau khi thanh toán.
         'is_paid': false,
       });
     }
 
+    // 1) Cập nhật trạng thái item trong DB trước
+    await ref.read(orderProvider.notifier).payItemsWithQuantities(orderId, itemsToPay);
+    await ref.read(orderProvider.notifier).loadOrderById(orderId);
+
+    // 2) Sau khi cập nhật xong, luôn gọi in hóa đơn cho phần vừa thanh toán
     if (itemsToPrint.isNotEmpty) {
       final currentOrder = ref.read(orderProvider).currentOrder;
       if (currentOrder != null) {
@@ -760,12 +769,12 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
           'order': partialOrder,
         };
         await ReceiptPrinter.print80mm(invoice: partialInvoice);
-        await ref.read(orderProvider.notifier).recordPrint(orderId);
+        await ref
+            .read(orderProvider.notifier)
+            .recordPrint(orderId, partialSubtotal, isPartial: true);
       }
     }
 
-    await ref.read(orderProvider.notifier).payItemsWithQuantities(orderId, itemsToPay);
-    await ref.read(orderProvider.notifier).loadOrderById(orderId);
     if (mounted) setState(() {});
   }
 

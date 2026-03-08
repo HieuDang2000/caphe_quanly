@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common/sqlite_api.dart';
 import 'database_factory_io.dart' if (dart.library.html) 'database_factory_web.dart' as db_factory;
 
-const _dbVersion = 5;
+const _dbVersion = 6;
 
 String _jsonEncode(dynamic value) => convert.jsonEncode(value);
 dynamic _jsonDecode(String value) => convert.jsonDecode(value);
@@ -190,6 +190,158 @@ class LocalDatabase {
     batch.execute('CREATE INDEX idx_invoices_order ON invoices (order_id)');
     batch.execute('CREATE INDEX idx_payments_invoice ON payments (invoice_id)');
 
+    // --- v6: additional tables ---
+    batch.execute('''
+      CREATE TABLE roles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        display_name TEXT NOT NULL,
+        description TEXT,
+        created_at TEXT,
+        updated_at TEXT
+      )
+    ''');
+
+    batch.execute('''
+      CREATE TABLE users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        phone TEXT,
+        avatar TEXT,
+        is_active INTEGER DEFAULT 1,
+        role_id INTEGER,
+        created_at TEXT,
+        updated_at TEXT,
+        FOREIGN KEY (role_id) REFERENCES roles (id)
+      )
+    ''');
+
+    batch.execute('''
+      CREATE TABLE customers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        phone TEXT,
+        email TEXT,
+        points INTEGER DEFAULT 0,
+        tier TEXT DEFAULT 'regular',
+        created_at TEXT,
+        updated_at TEXT
+      )
+    ''');
+
+    batch.execute('''
+      CREATE TABLE customer_points (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER NOT NULL,
+        order_id INTEGER,
+        points INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        description TEXT,
+        created_at TEXT,
+        updated_at TEXT,
+        FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE
+      )
+    ''');
+
+    batch.execute('''
+      CREATE TABLE reservations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER NOT NULL,
+        table_id INTEGER NOT NULL,
+        reservation_date TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        guests_count INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'pending',
+        notes TEXT,
+        created_at TEXT,
+        updated_at TEXT,
+        FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
+        FOREIGN KEY (table_id) REFERENCES layout_objects (id) ON DELETE CASCADE
+      )
+    ''');
+
+    batch.execute('''
+      CREATE TABLE inventory_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        unit TEXT DEFAULT 'pcs',
+        quantity REAL DEFAULT 0,
+        min_quantity REAL DEFAULT 0,
+        cost_per_unit REAL DEFAULT 0,
+        created_at TEXT,
+        updated_at TEXT
+      )
+    ''');
+
+    batch.execute('''
+      CREATE TABLE inventory_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        inventory_item_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        reason TEXT,
+        user_id INTEGER,
+        created_at TEXT,
+        updated_at TEXT,
+        FOREIGN KEY (inventory_item_id) REFERENCES inventory_items (id) ON DELETE CASCADE
+      )
+    ''');
+
+    batch.execute('''
+      CREATE TABLE staff_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE,
+        position TEXT,
+        salary REAL DEFAULT 0,
+        hire_date TEXT,
+        address TEXT,
+        emergency_contact TEXT,
+        created_at TEXT,
+        updated_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    ''');
+
+    batch.execute('''
+      CREATE TABLE shifts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        shift_date TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        status TEXT DEFAULT 'scheduled',
+        created_at TEXT,
+        updated_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    ''');
+
+    batch.execute('''
+      CREATE TABLE attendances (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        shift_id INTEGER,
+        check_in TEXT,
+        check_out TEXT,
+        created_at TEXT,
+        updated_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    ''');
+
+    batch.execute('CREATE INDEX idx_users_email ON users (email)');
+    batch.execute('CREATE INDEX idx_users_role ON users (role_id)');
+    batch.execute('CREATE INDEX idx_customers_phone ON customers (phone)');
+    batch.execute('CREATE INDEX idx_customer_points_customer ON customer_points (customer_id)');
+    batch.execute('CREATE INDEX idx_reservations_date ON reservations (reservation_date)');
+    batch.execute('CREATE INDEX idx_reservations_table ON reservations (table_id)');
+    batch.execute('CREATE INDEX idx_inventory_transactions_item ON inventory_transactions (inventory_item_id)');
+    batch.execute('CREATE INDEX idx_shifts_user ON shifts (user_id)');
+    batch.execute('CREATE INDEX idx_attendances_user ON attendances (user_id)');
+
     await batch.commit(noResult: true);
   }
 
@@ -223,6 +375,145 @@ class LocalDatabase {
       try {
         await db.execute('ALTER TABLE orders ADD COLUMN is_deleted_item INTEGER DEFAULT 0');
       } catch (_) {}
+    }
+    // v6: new tables for offline operation
+    if (oldVersion < 6) {
+      try { await db.execute('''
+        CREATE TABLE IF NOT EXISTS roles (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT UNIQUE NOT NULL,
+          display_name TEXT NOT NULL,
+          description TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        )
+      '''); } catch (_) {}
+
+      try { await db.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          phone TEXT,
+          avatar TEXT,
+          is_active INTEGER DEFAULT 1,
+          role_id INTEGER,
+          created_at TEXT,
+          updated_at TEXT,
+          FOREIGN KEY (role_id) REFERENCES roles (id)
+        )
+      '''); } catch (_) {}
+
+      try { await db.execute('''
+        CREATE TABLE IF NOT EXISTS customers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          phone TEXT,
+          email TEXT,
+          points INTEGER DEFAULT 0,
+          tier TEXT DEFAULT 'regular',
+          created_at TEXT,
+          updated_at TEXT
+        )
+      '''); } catch (_) {}
+
+      try { await db.execute('''
+        CREATE TABLE IF NOT EXISTS customer_points (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          customer_id INTEGER NOT NULL,
+          order_id INTEGER,
+          points INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          description TEXT,
+          created_at TEXT,
+          updated_at TEXT,
+          FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE
+        )
+      '''); } catch (_) {}
+
+      try { await db.execute('''
+        CREATE TABLE IF NOT EXISTS reservations (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          customer_id INTEGER NOT NULL,
+          table_id INTEGER NOT NULL,
+          reservation_date TEXT NOT NULL,
+          start_time TEXT NOT NULL,
+          end_time TEXT NOT NULL,
+          guests_count INTEGER DEFAULT 1,
+          status TEXT DEFAULT 'pending',
+          notes TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        )
+      '''); } catch (_) {}
+
+      try { await db.execute('''
+        CREATE TABLE IF NOT EXISTS inventory_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          unit TEXT DEFAULT 'pcs',
+          quantity REAL DEFAULT 0,
+          min_quantity REAL DEFAULT 0,
+          cost_per_unit REAL DEFAULT 0,
+          created_at TEXT,
+          updated_at TEXT
+        )
+      '''); } catch (_) {}
+
+      try { await db.execute('''
+        CREATE TABLE IF NOT EXISTS inventory_transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          inventory_item_id INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          reason TEXT,
+          user_id INTEGER,
+          created_at TEXT,
+          updated_at TEXT,
+          FOREIGN KEY (inventory_item_id) REFERENCES inventory_items (id) ON DELETE CASCADE
+        )
+      '''); } catch (_) {}
+
+      try { await db.execute('''
+        CREATE TABLE IF NOT EXISTS staff_profiles (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL UNIQUE,
+          position TEXT,
+          salary REAL DEFAULT 0,
+          hire_date TEXT,
+          address TEXT,
+          emergency_contact TEXT,
+          created_at TEXT,
+          updated_at TEXT,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      '''); } catch (_) {}
+
+      try { await db.execute('''
+        CREATE TABLE IF NOT EXISTS shifts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          shift_date TEXT NOT NULL,
+          start_time TEXT NOT NULL,
+          end_time TEXT NOT NULL,
+          status TEXT DEFAULT 'scheduled',
+          created_at TEXT,
+          updated_at TEXT
+        )
+      '''); } catch (_) {}
+
+      try { await db.execute('''
+        CREATE TABLE IF NOT EXISTS attendances (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          shift_id INTEGER,
+          check_in TEXT,
+          check_out TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        )
+      '''); } catch (_) {}
     }
   }
 
@@ -320,6 +611,17 @@ class LocalDatabase {
     'order_items': {'id', 'order_id', 'menu_item_id', 'quantity', 'unit_price', 'subtotal', 'notes', 'options', 'is_paid', 'created_at', 'updated_at'},
     'invoices': {'id', 'order_id', 'invoice_number', 'subtotal', 'tax_rate', 'tax_amount', 'discount_amount', 'total', 'payment_status', 'created_at', 'updated_at'},
     'payments': {'id', 'invoice_id', 'amount', 'payment_method', 'reference_number', 'paid_at', 'created_at', 'updated_at'},
+    // v6 tables
+    'roles': {'id', 'name', 'display_name', 'description', 'created_at', 'updated_at'},
+    'users': {'id', 'name', 'email', 'password_hash', 'phone', 'avatar', 'is_active', 'role_id', 'created_at', 'updated_at'},
+    'customers': {'id', 'name', 'phone', 'email', 'points', 'tier', 'created_at', 'updated_at'},
+    'customer_points': {'id', 'customer_id', 'order_id', 'points', 'type', 'description', 'created_at', 'updated_at'},
+    'reservations': {'id', 'customer_id', 'table_id', 'reservation_date', 'start_time', 'end_time', 'guests_count', 'status', 'notes', 'created_at', 'updated_at'},
+    'inventory_items': {'id', 'name', 'unit', 'quantity', 'min_quantity', 'cost_per_unit', 'created_at', 'updated_at'},
+    'inventory_transactions': {'id', 'inventory_item_id', 'type', 'quantity', 'reason', 'user_id', 'created_at', 'updated_at'},
+    'staff_profiles': {'id', 'user_id', 'position', 'salary', 'hire_date', 'address', 'emergency_contact', 'created_at', 'updated_at'},
+    'shifts': {'id', 'user_id', 'shift_date', 'start_time', 'end_time', 'status', 'created_at', 'updated_at'},
+    'attendances': {'id', 'user_id', 'shift_id', 'check_in', 'check_out', 'created_at', 'updated_at'},
   };
 
   static const _jsonColumns = {'properties', 'options'};
@@ -359,6 +661,13 @@ class LocalDatabase {
       }
     }
     return out;
+  }
+
+  /// Execute raw SQL (e.g. aggregate queries) and return rows.
+  Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<Object?> arguments = const []]) async {
+    final db = await database;
+    final rows = await db.rawQuery(sql, arguments);
+    return rows.map(_deserialize).toList();
   }
 
   Future<void> close() async {

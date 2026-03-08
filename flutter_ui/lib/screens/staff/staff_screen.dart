@@ -1,31 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../config/app_theme.dart';
-import '../../core/network/api_client.dart';
-import '../../config/api_config.dart';
 import '../../core/utils/formatters.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/staff_provider.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/responsive_layout.dart';
-
-final staffListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final api = ref.watch(apiClientProvider);
-  final res = await api.get(ApiConfig.staff);
-  return List<Map<String, dynamic>>.from(res.data);
-});
-
-final shiftsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final api = ref.watch(apiClientProvider);
-  final res = await api.get('${ApiConfig.staff}/shifts');
-  final data = res.data is Map ? (res.data as Map)['data'] : res.data;
-  return List<Map<String, dynamic>>.from(data ?? []);
-});
-
-final attendancesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final api = ref.watch(apiClientProvider);
-  final res = await api.get('${ApiConfig.staff}/attendances');
-  final data = res.data is Map ? (res.data as Map)['data'] : res.data;
-  return List<Map<String, dynamic>>.from(data ?? []);
-});
 
 class StaffScreen extends ConsumerStatefulWidget {
   const StaffScreen({super.key});
@@ -34,7 +15,8 @@ class StaffScreen extends ConsumerStatefulWidget {
   ConsumerState<StaffScreen> createState() => _StaffScreenState();
 }
 
-class _StaffScreenState extends ConsumerState<StaffScreen> with SingleTickerProviderStateMixin {
+class _StaffScreenState extends ConsumerState<StaffScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -81,47 +63,57 @@ class _StaffScreenState extends ConsumerState<StaffScreen> with SingleTickerProv
 class _StaffListTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final staffAsync = ref.watch(staffListProvider);
+    final state = ref.watch(staffProvider);
 
-    return staffAsync.when(
-      loading: () => const LoadingWidget(),
-      error: (e, _) => Center(child: Text('Lỗi: $e')),
-      data: (staff) => ListView.builder(
-        padding: EdgeInsets.all(isMobile(context) ? 8 : 12),
-        itemCount: staff.length,
-        itemBuilder: (_, index) {
-          final s = staff[index];
-          final profile = s['staff_profile'] as Map<String, dynamic>?;
-          return Card(
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: AppTheme.primaryColor,
-                child: Text((s['name'] ?? 'U')[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
-              ),
-              title: Text(s['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text('${s['role']?['display_name'] ?? ''} • ${profile?['position'] ?? 'Chưa phân công'}'),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (profile?['salary'] != null) Text(Formatters.currency(profile!['salary']), style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(s['phone'] ?? '', style: const TextStyle(fontSize: 12)),
-                ],
-              ),
-              onTap: () => _showProfileDialog(context, ref, s),
+    if (state.isLoading) return const LoadingWidget();
+    if (state.error != null) return Center(child: Text('Lỗi: ${state.error}'));
+
+    return ListView.builder(
+      padding: EdgeInsets.all(isMobile(context) ? 8 : 12),
+      itemCount: state.staff.length,
+      itemBuilder: (_, index) {
+        final s = state.staff[index];
+        final profile = s['staff_profile'] as Map<String, dynamic>?;
+        return Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: AppTheme.primaryColor,
+              child: Text((s['name'] ?? 'U')[0].toUpperCase(),
+                  style: const TextStyle(color: Colors.white)),
             ),
-          );
-        },
-      ),
+            title: Text(s['name'] ?? '',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(
+                '${s['role']?['display_name'] ?? ''} • ${profile?['position'] ?? 'Chưa phân công'}'),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (profile?['salary'] != null)
+                  Text(Formatters.currency(profile!['salary']),
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(s['phone'] ?? '',
+                    style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+            onTap: () => _showProfileDialog(context, ref, s),
+          ),
+        );
+      },
     );
   }
 
-  void _showProfileDialog(BuildContext context, WidgetRef ref, Map<String, dynamic> staff) {
+  void _showProfileDialog(
+      BuildContext context, WidgetRef ref, Map<String, dynamic> staff) {
     final profile = staff['staff_profile'] as Map<String, dynamic>?;
-    final posController = TextEditingController(text: profile?['position'] ?? '');
-    final salaryController = TextEditingController(text: profile?['salary']?.toString() ?? '');
-    final addressController = TextEditingController(text: profile?['address'] ?? '');
-    final emergencyController = TextEditingController(text: profile?['emergency_contact'] ?? '');
+    final posController =
+        TextEditingController(text: profile?['position'] ?? '');
+    final salaryController =
+        TextEditingController(text: profile?['salary']?.toString() ?? '');
+    final addressController =
+        TextEditingController(text: profile?['address'] ?? '');
+    final emergencyController =
+        TextEditingController(text: profile?['emergency_contact'] ?? '');
 
     showDialog(
       context: context,
@@ -131,30 +123,49 @@ class _StaffListTab extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: posController, decoration: const InputDecoration(labelText: 'Vị trí')),
+              TextField(
+                  controller: posController,
+                  decoration:
+                      const InputDecoration(labelText: 'Vị trí')),
               const SizedBox(height: 12),
-              TextField(controller: salaryController, decoration: const InputDecoration(labelText: 'Lương'), keyboardType: TextInputType.number),
+              TextField(
+                  controller: salaryController,
+                  decoration: const InputDecoration(labelText: 'Lương'),
+                  keyboardType: TextInputType.number),
               const SizedBox(height: 12),
-              TextField(controller: addressController, decoration: const InputDecoration(labelText: 'Địa chỉ'), maxLines: 2),
+              TextField(
+                  controller: addressController,
+                  decoration:
+                      const InputDecoration(labelText: 'Địa chỉ'),
+                  maxLines: 2),
               const SizedBox(height: 12),
-              TextField(controller: emergencyController, decoration: const InputDecoration(labelText: 'Liên hệ khẩn cấp')),
+              TextField(
+                  controller: emergencyController,
+                  decoration: const InputDecoration(
+                      labelText: 'Liên hệ khẩn cấp')),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
           ElevatedButton(
             onPressed: () async {
-              final api = ref.read(apiClientProvider);
-              await api.put('${ApiConfig.staff}/${staff['id']}/profile', data: {
-                'position': posController.text,
-                'salary': double.tryParse(salaryController.text) ?? 0,
-                'address': addressController.text,
-                'emergency_contact': emergencyController.text,
-              });
+              final ok = await ref.read(staffProvider.notifier).updateProfile(
+                staff['id'] as int,
+                {
+                  'position': posController.text,
+                  'salary': double.tryParse(salaryController.text) ?? 0,
+                  'address': addressController.text,
+                  'emergency_contact': emergencyController.text,
+                },
+              );
               if (context.mounted) {
                 Navigator.pop(context);
-                ref.invalidate(staffListProvider);
+                if (!ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(ref.read(staffProvider).error ?? 'Lỗi')));
+                }
               }
             },
             child: const Text('Lưu'),
@@ -168,98 +179,117 @@ class _StaffListTab extends ConsumerWidget {
 class _ShiftsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final shiftsAsync = ref.watch(shiftsProvider);
+    final state = ref.watch(staffProvider);
 
-    return shiftsAsync.when(
-      loading: () => const LoadingWidget(),
-      error: (e, _) => Center(child: Text('Lỗi: $e')),
-      data: (shifts) => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: ElevatedButton.icon(
-              onPressed: () => _addShiftDialog(context, ref),
-              icon: const Icon(Icons.add),
-              label: const Text('Thêm ca'),
-            ),
+    if (state.isLoading) return const LoadingWidget();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: ElevatedButton.icon(
+            onPressed: () => _addShiftDialog(context, ref),
+            icon: const Icon(Icons.add),
+            label: const Text('Thêm ca'),
           ),
-          Expanded(
-            child: shifts.isEmpty
-                ? const Center(child: Text('Chưa có ca làm'))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: shifts.length,
-                    itemBuilder: (_, i) {
-                      final shift = shifts[i];
-                      return Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.schedule, color: AppTheme.primaryColor),
-                          title: Text(shift['user']?['name'] ?? ''),
-                          subtitle: Text('${shift['shift_date']} | ${shift['start_time']} - ${shift['end_time']}'),
-                          trailing: Chip(label: Text(shift['status'] ?? 'scheduled', style: const TextStyle(fontSize: 12))),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
+        ),
+        Expanded(
+          child: state.shifts.isEmpty
+              ? const Center(child: Text('Chưa có ca làm'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(8),
+                  itemCount: state.shifts.length,
+                  itemBuilder: (_, i) {
+                    final shift = state.shifts[i];
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.schedule,
+                            color: AppTheme.primaryColor),
+                        title: Text(shift['user']?['name'] ?? ''),
+                        subtitle: Text(
+                            '${shift['shift_date']} | ${shift['start_time']} - ${shift['end_time']}'),
+                        trailing: Chip(
+                            label: Text(
+                                shift['status'] ?? 'scheduled',
+                                style: const TextStyle(fontSize: 12))),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
   void _addShiftDialog(BuildContext context, WidgetRef ref) {
-    final userIdController = TextEditingController();
-    final dateController = TextEditingController();
+    // Build dropdown list from staff
+    final staffList = ref.read(staffProvider).staff;
+    int? selectedUserId;
+    final dateController = TextEditingController(
+        text: DateTime.now().toIso8601String().substring(0, 10));
     final startController = TextEditingController(text: '08:00');
     final endController = TextEditingController(text: '16:00');
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Thêm ca làm'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: userIdController, decoration: const InputDecoration(labelText: 'User ID'), keyboardType: TextInputType.number),
-              const SizedBox(height: 12),
-              TextField(controller: dateController, decoration: const InputDecoration(labelText: 'Ngày (YYYY-MM-DD)')),
-              const SizedBox(height: 12),
-              TextField(controller: startController, decoration: const InputDecoration(labelText: 'Giờ bắt đầu (HH:mm)')),
-              const SizedBox(height: 12),
-              TextField(controller: endController, decoration: const InputDecoration(labelText: 'Giờ kết thúc (HH:mm)')),
-            ],
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Thêm ca làm'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  value: selectedUserId,
+                  decoration: const InputDecoration(labelText: 'Nhân viên'),
+                  items: staffList
+                      .map((s) => DropdownMenuItem<int>(
+                          value: s['id'] as int,
+                          child: Text(s['name'] as String? ?? '')))
+                      .toList(),
+                  onChanged: (v) => setDialogState(() => selectedUserId = v),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: dateController,
+                    decoration: const InputDecoration(
+                        labelText: 'Ngày (YYYY-MM-DD)')),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: startController,
+                    decoration: const InputDecoration(
+                        labelText: 'Giờ bắt đầu (HH:mm)')),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: endController,
+                    decoration: const InputDecoration(
+                        labelText: 'Giờ kết thúc (HH:mm)')),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final api = ref.read(apiClientProvider);
-              try {
-                await api.post('${ApiConfig.staff}/shifts', data: {
-                  'user_id': int.tryParse(userIdController.text),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Hủy')),
+            ElevatedButton(
+              onPressed: () async {
+                if (selectedUserId == null) return;
+                final ok = await ref.read(staffProvider.notifier).createShift({
+                  'user_id': selectedUserId,
                   'shift_date': dateController.text,
                   'start_time': startController.text,
                   'end_time': endController.text,
                 });
                 if (dialogContext.mounted) {
                   Navigator.of(dialogContext).pop();
-                  ref.invalidate(shiftsProvider);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã tạo ca làm')));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(ok ? 'Đã tạo ca làm' : 'Lỗi tạo ca')));
                 }
-              } catch (e) {
-                if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
-                }
-              }
-            },
-            child: const Text('Tạo'),
-          ),
-        ],
+              },
+              child: const Text('Tạo'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -268,75 +298,80 @@ class _ShiftsTab extends ConsumerWidget {
 class _AttendanceTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final attendancesAsync = ref.watch(attendancesProvider);
+    final state = ref.watch(staffProvider);
+    final authState = ref.watch(authProvider);
+    final currentUserId = authState.user?['id'] as int?;
 
-    return attendancesAsync.when(
-      loading: () => const LoadingWidget(),
-      error: (e, _) => Center(child: Text('Lỗi: $e')),
-      data: (attendances) => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    try {
-                      await ref.read(apiClientProvider).post('${ApiConfig.staff}/check-in');
-                      if (context.mounted) {
-                        ref.invalidate(attendancesProvider);
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Check-in thành công!')));
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
-                      }
-                    }
-                  },
-                  icon: const Icon(Icons.login),
-                  label: const Text('Check In'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    try {
-                      await ref.read(apiClientProvider).post('${ApiConfig.staff}/check-out');
-                      if (context.mounted) {
-                        ref.invalidate(attendancesProvider);
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Check-out thành công!')));
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
-                      }
-                    }
-                  },
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Check Out'),
-                ),
-              ],
-            ),
+    if (state.isLoading) return const LoadingWidget();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton.icon(
+                onPressed: currentUserId == null
+                    ? null
+                    : () async {
+                        final ok = await ref
+                            .read(staffProvider.notifier)
+                            .checkIn(currentUserId);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(ok
+                                  ? 'Check-in thành công!'
+                                  : (ref.read(staffProvider).error ??
+                                      'Lỗi check-in'))));
+                        }
+                      },
+                icon: const Icon(Icons.login),
+                label: const Text('Check In'),
+              ),
+              OutlinedButton.icon(
+                onPressed: currentUserId == null
+                    ? null
+                    : () async {
+                        final ok = await ref
+                            .read(staffProvider.notifier)
+                            .checkOut(currentUserId);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(ok
+                                  ? 'Check-out thành công!'
+                                  : (ref.read(staffProvider).error ??
+                                      'Lỗi check-out'))));
+                        }
+                      },
+                icon: const Icon(Icons.logout),
+                label: const Text('Check Out'),
+              ),
+            ],
           ),
-          Expanded(
-            child: attendances.isEmpty
-                ? const Center(child: Text('Chưa có bản ghi chấm công'))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: attendances.length,
-                    itemBuilder: (_, i) {
-                      final att = attendances[i];
-                      return Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.fingerprint, color: AppTheme.primaryColor),
-                          title: Text(att['user']?['name'] ?? ''),
-                          subtitle: Text('In: ${att['check_in'] ?? '-'}\nOut: ${att['check_out'] ?? '-'}'),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
+        ),
+        Expanded(
+          child: state.attendances.isEmpty
+              ? const Center(child: Text('Chưa có bản ghi chấm công'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(8),
+                  itemCount: state.attendances.length,
+                  itemBuilder: (_, i) {
+                    final att = state.attendances[i];
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.fingerprint,
+                            color: AppTheme.primaryColor),
+                        title: Text(att['user']?['name'] ?? ''),
+                        subtitle: Text(
+                            'Vào: ${att['check_in'] ?? '-'}\nRa: ${att['check_out'] ?? '-'}'),
+                        isThreeLine: true,
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

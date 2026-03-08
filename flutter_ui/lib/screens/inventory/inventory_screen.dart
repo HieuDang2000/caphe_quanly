@@ -1,24 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../config/app_theme.dart';
-import '../../core/network/api_client.dart';
-import '../../config/api_config.dart';
 import '../../core/utils/formatters.dart';
+import '../../providers/inventory_provider.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/responsive_layout.dart';
-
-final inventoryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final api = ref.watch(apiClientProvider);
-  final res = await api.get(ApiConfig.inventory);
-  return List<Map<String, dynamic>>.from(res.data);
-});
 
 class InventoryScreen extends ConsumerWidget {
   const InventoryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final inventoryAsync = ref.watch(inventoryProvider);
+    final state = ref.watch(inventoryNotifierProvider);
     final mobile = isMobile(context);
 
     return Scaffold(
@@ -30,51 +24,80 @@ class InventoryScreen extends ConsumerWidget {
             tooltip: 'Sắp hết',
             onPressed: () => _showLowStock(context, ref),
           ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => ref.read(inventoryNotifierProvider.notifier).load(),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addItemDialog(context, ref),
         child: const Icon(Icons.add),
       ),
-      body: inventoryAsync.when(
-        loading: () => const LoadingWidget(),
-        error: (e, _) => Center(child: Text('Lỗi: $e')),
-        data: (items) => ListView.builder(
-          padding: EdgeInsets.all(mobile ? 8 : 12),
-          itemCount: items.length,
-          itemBuilder: (_, index) {
-            final item = items[index];
-            final qty = Formatters.toNum(item['quantity']).toDouble();
-            final minQty = Formatters.toNum(item['min_quantity']).toDouble();
-            final isLow = qty <= minQty;
+      body: state.isLoading
+          ? const LoadingWidget()
+          : state.error != null
+              ? Center(child: Text('Lỗi: ${state.error}'))
+              : RefreshIndicator(
+                  onRefresh: () =>
+                      ref.read(inventoryNotifierProvider.notifier).load(),
+                  child: ListView.builder(
+                    padding: EdgeInsets.all(mobile ? 8 : 12),
+                    itemCount: state.items.length,
+                    itemBuilder: (_, index) {
+                      final item = state.items[index];
+                      final qty =
+                          Formatters.toNum(item['quantity']).toDouble();
+                      final minQty =
+                          Formatters.toNum(item['min_quantity']).toDouble();
+                      final isLow = qty <= minQty;
 
-            return Card(
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: isLow ? AppTheme.errorColor.withValues(alpha: 0.15) : AppTheme.primaryColor.withValues(alpha: 0.15),
-                  child: Icon(isLow ? Icons.warning : Icons.inventory_2, color: isLow ? AppTheme.errorColor : AppTheme.primaryColor),
+                      return Card(
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: isLow
+                                ? AppTheme.errorColor.withValues(alpha: 0.15)
+                                : AppTheme.primaryColor.withValues(alpha: 0.15),
+                            child: Icon(
+                                isLow ? Icons.warning : Icons.inventory_2,
+                                color: isLow
+                                    ? AppTheme.errorColor
+                                    : AppTheme.primaryColor),
+                          ),
+                          title: Text(item['name'] ?? '',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: Row(
+                            children: [
+                              Text(
+                                  '${qty.toStringAsFixed(1)} ${item['unit']}'),
+                              if (isLow) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 1),
+                                  decoration: BoxDecoration(
+                                      color: AppTheme.errorColor
+                                          .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4)),
+                                  child: const Text('Sắp hết',
+                                      style: TextStyle(
+                                          color: AppTheme.errorColor,
+                                          fontSize: 11)),
+                                ),
+                              ],
+                            ],
+                          ),
+                          trailing: Text(
+                              Formatters.currency(item['cost_per_unit'] ?? 0),
+                              style: const TextStyle(fontSize: 12)),
+                          onTap: () =>
+                              _showTransactionDialog(context, ref, item),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                title: Text(item['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Row(
-                  children: [
-                    Text('${qty.toStringAsFixed(1)} ${item['unit']}'),
-                    if (isLow) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(color: AppTheme.errorColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
-                        child: const Text('Sắp hết', style: TextStyle(color: AppTheme.errorColor, fontSize: 11)),
-                      ),
-                    ],
-                  ],
-                ),
-                trailing: Text(Formatters.currency(item['cost_per_unit'] ?? 0), style: const TextStyle(fontSize: 12)),
-                onTap: () => _showTransactionDialog(context, ref, item),
-              ),
-            );
-          },
-        ),
-      ),
     );
   }
 
@@ -93,33 +116,54 @@ class InventoryScreen extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Tên')),
+              TextField(
+                  controller: nameC,
+                  decoration: const InputDecoration(labelText: 'Tên')),
               const SizedBox(height: 12),
-              TextField(controller: unitC, decoration: const InputDecoration(labelText: 'Đơn vị (kg, l, pcs...)')),
+              TextField(
+                  controller: unitC,
+                  decoration: const InputDecoration(
+                      labelText: 'Đơn vị (kg, l, pcs...)')),
               const SizedBox(height: 12),
-              TextField(controller: qtyC, decoration: const InputDecoration(labelText: 'Số lượng'), keyboardType: TextInputType.number),
+              TextField(
+                  controller: qtyC,
+                  decoration: const InputDecoration(labelText: 'Số lượng'),
+                  keyboardType: TextInputType.number),
               const SizedBox(height: 12),
-              TextField(controller: minC, decoration: const InputDecoration(labelText: 'SL tối thiểu'), keyboardType: TextInputType.number),
+              TextField(
+                  controller: minC,
+                  decoration:
+                      const InputDecoration(labelText: 'SL tối thiểu'),
+                  keyboardType: TextInputType.number),
               const SizedBox(height: 12),
-              TextField(controller: costC, decoration: const InputDecoration(labelText: 'Giá/đơn vị'), keyboardType: TextInputType.number),
+              TextField(
+                  controller: costC,
+                  decoration: const InputDecoration(labelText: 'Giá/đơn vị'),
+                  keyboardType: TextInputType.number),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
           ElevatedButton(
             onPressed: () async {
-              final api = ref.read(apiClientProvider);
-              await api.post(ApiConfig.inventory, data: {
-                'name': nameC.text,
-                'unit': unitC.text,
+              if (nameC.text.isEmpty) return;
+              final ok =
+                  await ref.read(inventoryNotifierProvider.notifier).create({
+                'name': nameC.text.trim(),
+                'unit': unitC.text.trim(),
                 'quantity': double.tryParse(qtyC.text) ?? 0,
                 'min_quantity': double.tryParse(minC.text) ?? 0,
                 'cost_per_unit': double.tryParse(costC.text) ?? 0,
               });
               if (context.mounted) {
                 Navigator.pop(context);
-                ref.invalidate(inventoryProvider);
+                if (!ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(
+                          ref.read(inventoryNotifierProvider).error ?? 'Lỗi')));
+                }
               }
             },
             child: const Text('Thêm'),
@@ -129,7 +173,8 @@ class InventoryScreen extends ConsumerWidget {
     );
   }
 
-  void _showTransactionDialog(BuildContext context, WidgetRef ref, Map<String, dynamic> item) {
+  void _showTransactionDialog(
+      BuildContext context, WidgetRef ref, Map<String, dynamic> item) {
     final qtyC = TextEditingController();
     final reasonC = TextEditingController();
     String type = 'in';
@@ -143,38 +188,66 @@ class InventoryScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Tồn kho: ${Formatters.toNum(item['quantity']).toStringAsFixed(1)} ${item['unit']}'),
+                Text(
+                    'Tồn kho: ${Formatters.toNum(item['quantity']).toStringAsFixed(1)} ${item['unit']}'),
                 const SizedBox(height: 16),
                 SegmentedButton<String>(
                   segments: const [
-                    ButtonSegment(value: 'in', label: Text('Nhập'), icon: Icon(Icons.add)),
-                    ButtonSegment(value: 'out', label: Text('Xuất'), icon: Icon(Icons.remove)),
-                    ButtonSegment(value: 'adjust', label: Text('Điều chỉnh'), icon: Icon(Icons.edit)),
+                    ButtonSegment(
+                        value: 'in',
+                        label: Text('Nhập'),
+                        icon: Icon(Icons.add)),
+                    ButtonSegment(
+                        value: 'out',
+                        label: Text('Xuất'),
+                        icon: Icon(Icons.remove)),
+                    ButtonSegment(
+                        value: 'adjust',
+                        label: Text('Điều chỉnh'),
+                        icon: Icon(Icons.edit)),
                   ],
                   selected: {type},
-                  onSelectionChanged: (v) => setDialogState(() => type = v.first),
+                  onSelectionChanged: (v) =>
+                      setDialogState(() => type = v.first),
                 ),
                 const SizedBox(height: 16),
-                TextField(controller: qtyC, decoration: const InputDecoration(labelText: 'Số lượng'), keyboardType: TextInputType.number),
+                TextField(
+                    controller: qtyC,
+                    decoration:
+                        const InputDecoration(labelText: 'Số lượng'),
+                    keyboardType: TextInputType.number),
                 const SizedBox(height: 12),
-                TextField(controller: reasonC, decoration: const InputDecoration(labelText: 'Lý do')),
+                TextField(
+                    controller: reasonC,
+                    decoration:
+                        const InputDecoration(labelText: 'Lý do')),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Hủy')),
             ElevatedButton(
               onPressed: () async {
-                final api = ref.read(apiClientProvider);
-                await api.post('${ApiConfig.inventory}/transactions', data: {
-                  'inventory_item_id': item['id'],
-                  'type': type,
-                  'quantity': double.tryParse(qtyC.text) ?? 0,
-                  'reason': reasonC.text,
-                });
+                final qty = double.tryParse(qtyC.text);
+                if (qty == null || qty <= 0) return;
+                final ok = await ref
+                    .read(inventoryNotifierProvider.notifier)
+                    .addTransaction(
+                      itemId: item['id'] as int,
+                      type: type,
+                      quantity: qty,
+                      reason: reasonC.text.isNotEmpty ? reasonC.text : null,
+                    );
                 if (context.mounted) {
                   Navigator.pop(context);
-                  ref.invalidate(inventoryProvider);
+                  if (!ok) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(
+                            ref.read(inventoryNotifierProvider).error ??
+                                'Lỗi')));
+                  }
                 }
               },
               child: const Text('Xác nhận'),
@@ -185,12 +258,9 @@ class InventoryScreen extends ConsumerWidget {
     );
   }
 
-  void _showLowStock(BuildContext context, WidgetRef ref) async {
-    final api = ref.read(apiClientProvider);
-    final res = await api.get('${ApiConfig.inventory}/low-stock');
-    final items = List<Map<String, dynamic>>.from(res.data);
+  void _showLowStock(BuildContext context, WidgetRef ref) {
+    final items = ref.read(inventoryNotifierProvider.notifier).lowStockItems;
 
-    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -201,15 +271,23 @@ class InventoryScreen extends ConsumerWidget {
                 width: double.maxFinite,
                 child: ListView(
                   shrinkWrap: true,
-                  children: items.map((item) => ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.warning, color: AppTheme.errorColor),
-                    title: Text(item['name'] ?? ''),
-                    subtitle: Text('Còn: ${Formatters.toNum(item['quantity']).toStringAsFixed(1)} ${item['unit']} (tối thiểu: ${Formatters.toNum(item['min_quantity']).toStringAsFixed(1)})'),
-                  )).toList(),
+                  children: items
+                      .map((item) => ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.warning,
+                                color: AppTheme.errorColor),
+                            title: Text(item['name'] ?? ''),
+                            subtitle: Text(
+                                'Còn: ${Formatters.toNum(item['quantity']).toStringAsFixed(1)} ${item['unit']} (tối thiểu: ${Formatters.toNum(item['min_quantity']).toStringAsFixed(1)})'),
+                          ))
+                      .toList(),
                 ),
               ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng'))],
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Đóng'))
+        ],
       ),
     );
   }
