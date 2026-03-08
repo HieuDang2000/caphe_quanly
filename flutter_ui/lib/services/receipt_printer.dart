@@ -18,6 +18,13 @@ class ReceiptPrinter {
     );
   }
 
+  /// Xây dựng PDF hoá đơn khổ 80mm để tái sử dụng cho in trực tiếp.
+  static Future<Uint8List> build80mmPdfBytes({
+    required Map<String, dynamic> invoice,
+  }) {
+    return _build80mmPdfBytes(invoice: invoice);
+  }
+
   static Future<void> share80mm({
     required Map<String, dynamic> invoice,
   }) async {

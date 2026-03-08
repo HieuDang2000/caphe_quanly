@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common/sqlite_api.dart';
 import 'database_factory_io.dart' if (dart.library.html) 'database_factory_web.dart' as db_factory;
 
-const _dbVersion = 6;
+const _dbVersion = 7;
 
 String _jsonEncode(dynamic value) => convert.jsonEncode(value);
 dynamic _jsonDecode(String value) => convert.jsonDecode(value);
@@ -332,6 +332,13 @@ class LocalDatabase {
       )
     ''');
 
+    batch.execute('''
+      CREATE TABLE app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      )
+    ''');
+
     batch.execute('CREATE INDEX idx_users_email ON users (email)');
     batch.execute('CREATE INDEX idx_users_role ON users (role_id)');
     batch.execute('CREATE INDEX idx_customers_phone ON customers (phone)');
@@ -515,6 +522,18 @@ class LocalDatabase {
         )
       '''); } catch (_) {}
     }
+
+    // v7: app-level settings (e.g. printer config)
+    if (oldVersion < 7) {
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+          )
+        ''');
+      } catch (_) {}
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -622,9 +641,10 @@ class LocalDatabase {
     'staff_profiles': {'id', 'user_id', 'position', 'salary', 'hire_date', 'address', 'emergency_contact', 'created_at', 'updated_at'},
     'shifts': {'id', 'user_id', 'shift_date', 'start_time', 'end_time', 'status', 'created_at', 'updated_at'},
     'attendances': {'id', 'user_id', 'shift_id', 'check_in', 'check_out', 'created_at', 'updated_at'},
+    'app_settings': {'key', 'value'},
   };
 
-  static const _jsonColumns = {'properties', 'options'};
+  static const _jsonColumns = {'properties', 'options', 'value'};
   static const _boolColumns = {'is_active', 'is_available', 'is_paid', 'is_deleted_item'};
 
   Map<String, dynamic> _sanitize(String table, Map<String, dynamic> row) {

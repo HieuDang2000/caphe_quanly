@@ -5,7 +5,8 @@ import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/layout_provider.dart';
-import '../../services/receipt_printer.dart';
+import '../../providers/printer_provider.dart';
+import '../../services/print_service.dart';
 
 class OrderCartBar extends ConsumerStatefulWidget {
   const OrderCartBar({super.key, this.isBottomBar = false});
@@ -471,7 +472,33 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
                             'discount_amount': 0,
                             'order': fullOrder,
                           };
-                          await ReceiptPrinter.print80mm(invoice: invoice);
+
+                          final printerState = ref.read(printerProvider);
+                          final config = printerState.config;
+                          if (config == null || !printerState.hasSelectedPrinter) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Vui lòng chọn máy in mặc định ở thanh bên trước khi in hoá đơn.'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          try {
+                            await PrintService.printReceipt80mmToSystemPrinter(
+                              config: config,
+                              invoice: invoice,
+                            );
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('In hoá đơn thất bại: $e'),
+                              ),
+                            );
+                            return;
+                          }
                           final oid = currentOrder['id'] as int?;
                           if (oid != null) {
                             await ref
@@ -768,7 +795,31 @@ class _OrderCartBarState extends ConsumerState<OrderCartBar> {
           'discount_amount': 0,
           'order': partialOrder,
         };
-        await ReceiptPrinter.print80mm(invoice: partialInvoice);
+
+        final printerState = ref.read(printerProvider);
+        final config = printerState.config;
+        if (config == null || !printerState.hasSelectedPrinter) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Vui lòng chọn máy in mặc định ở thanh bên trước khi in hoá đơn.'),
+            ),
+          );
+        } else {
+          try {
+            await PrintService.printReceipt80mmToSystemPrinter(
+              config: config,
+              invoice: partialInvoice,
+            );
+          } catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('In hoá đơn thất bại: $e'),
+              ),
+            );
+          }
+        }
         await ref
             .read(orderProvider.notifier)
             .recordPrint(orderId, partialSubtotal, isPartial: true);

@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/order_provider.dart';
-import '../../services/receipt_printer.dart';
+import '../../providers/printer_provider.dart';
+import '../../services/print_service.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/responsive_layout.dart';
 
@@ -408,7 +409,30 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                           'order': fullOrder,
                                         };
 
-                                        await ReceiptPrinter.print80mm(invoice: invoice);
+                                        final printerState = ref.read(printerProvider);
+                                        final config = printerState.config;
+                                        if (config == null || !printerState.hasSelectedPrinter) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Vui lòng chọn máy in mặc định ở thanh bên trước khi in hoá đơn.'),
+                                            ),
+                                          );
+                                          return;
+                                        }
+
+                                        try {
+                                          await PrintService.printReceipt80mmToSystemPrinter(
+                                            config: config,
+                                            invoice: invoice,
+                                          );
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('In hoá đơn thất bại: $e'),
+                                            ),
+                                          );
+                                          return;
+                                        }
                                         await ref
                                             .read(orderProvider.notifier)
                                             .recordPrint(orderId, subtotal, isPartial: false);

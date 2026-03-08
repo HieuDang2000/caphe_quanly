@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../providers/printer_provider.dart';
 
 /// Các chế độ hiển thị sidebar.
 enum SidebarMode { expanded, compact, hidden }
@@ -74,6 +75,7 @@ class _Sidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
+    final printerState = ref.watch(printerProvider);
     final user = authState.user;
     final role = user?['role']?['name'] ?? 'staff';
     final showLabels = mode == SidebarMode.expanded;
@@ -151,6 +153,79 @@ class _Sidebar extends ConsumerWidget {
                 _SidebarItem(icon: Icons.event_seat, label: 'Đặt bàn', route: '/reservations', showLabel: showLabels),
               ],
               const Divider(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.print, size: 18, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 8),
+                        if (showLabels)
+                          Expanded(
+                            child: Text(
+                              'Máy in',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh, size: 18),
+                          tooltip: 'Tải lại danh sách máy in',
+                          onPressed: () {
+                            ref.read(printerProvider.notifier).refreshPrinters();
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    if (printerState.isLoading)
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else if (printerState.printers.isEmpty)
+                      Text(
+                        'Chưa tìm thấy máy in',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                      )
+                    else
+                      DropdownButton(
+                        isExpanded: true,
+                        value: printerState.selectedPrinter,
+                        hint: const Text('Chọn máy in'),
+                        items: printerState.printers
+                            .map(
+                              (p) => DropdownMenuItem(
+                                value: p,
+                                child: Text(
+                                  p.name,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (dynamic printer) {
+                          if (printer == null) return;
+                          ref.read(printerProvider.notifier).selectSystemPrinter(printer);
+                        },
+                      ),
+                    if (printerState.selectedPrinter == null)
+                      Text(
+                        'Chưa chọn máy in mặc định',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                      )
+                    else
+                      Text(
+                        'Đang dùng: ${printerState.selectedPrinter!.name}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
               ListTile(
                 leading: const Icon(Icons.logout, color: AppTheme.errorColor),
                 title: showLabels
