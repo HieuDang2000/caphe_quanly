@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 
 import '../repositories/printer_repository.dart';
+import '../repositories/receipt_template_repository.dart';
 import 'receipt_printer.dart';
 
 class PrintService {
@@ -14,6 +15,7 @@ class PrintService {
   static Future<void> printReceipt80mmToSystemPrinter({
     required PrinterConfig config,
     required Map<String, dynamic> invoice,
+    ReceiptTemplate? template,
   }) async {
     try {
       // Tìm lại đối tượng Printer tương ứng trong danh sách máy in hiện có.
@@ -31,7 +33,10 @@ class PrintService {
         orElse: () => throw Exception('Không tìm thấy máy in đã cấu hình: ${config.name}'),
       );
 
-      final bytes = await ReceiptPrinter.build80mmPdfBytes(invoice: invoice);
+      final bytes = await ReceiptPrinter.build80mmPdfBytes(
+        invoice: invoice,
+        template: template,
+      );
 
       await Printing.directPrintPdf(
         printer: target,

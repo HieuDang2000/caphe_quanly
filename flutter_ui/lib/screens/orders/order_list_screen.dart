@@ -4,6 +4,7 @@ import '../../config/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/printer_provider.dart';
+import '../../providers/receipt_template_provider.dart';
 import '../../services/print_service.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/responsive_layout.dart';
@@ -411,8 +412,9 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
 
                                         final printerState = ref.read(printerProvider);
                                         final config = printerState.config;
+                                        final messenger = ScaffoldMessenger.of(context);
                                         if (config == null || !printerState.hasSelectedPrinter) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          messenger.showSnackBar(
                                             const SnackBar(
                                               content: Text('Vui lòng chọn máy in mặc định ở thanh bên trước khi in hoá đơn.'),
                                             ),
@@ -421,12 +423,14 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                                         }
 
                                         try {
+                                          final tpl = ref.read(receiptTemplateProvider).template;
                                           await PrintService.printReceipt80mmToSystemPrinter(
                                             config: config,
                                             invoice: invoice,
+                                            template: tpl,
                                           );
                                         } catch (e) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          messenger.showSnackBar(
                                             SnackBar(
                                               content: Text('In hoá đơn thất bại: $e'),
                                             ),

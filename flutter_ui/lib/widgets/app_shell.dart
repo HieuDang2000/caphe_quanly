@@ -153,6 +153,12 @@ class _Sidebar extends ConsumerWidget {
                 _SidebarItem(icon: Icons.event_seat, label: 'Đặt bàn', route: '/reservations', showLabel: showLabels),
               ],
               const Divider(),
+              _SidebarItem(
+                icon: Icons.receipt_long,
+                label: 'Nội dung in',
+                route: '/settings/receipt-template',
+                showLabel: showLabels,
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Column(

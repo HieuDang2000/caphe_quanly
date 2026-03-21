@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/utils/formatters.dart';
 import '../repositories/order_repository.dart';
+import '../repositories/order_ui_state_repository.dart';
 
 class OrderState {
   final List<Map<String, dynamic>> orders;
@@ -78,9 +79,43 @@ class OrderState {
 
 class OrderNotifier extends StateNotifier<OrderState> {
   final OrderRepository _repo;
+  final OrderUiStateRepository _uiRepo;
   Timer? _pollTimer;
+  Timer? _persistDebounce;
 
-  OrderNotifier(this._repo) : super(const OrderState());
+  OrderNotifier(this._repo, this._uiRepo) : super(const OrderState()) {
+    _hydrateFromUiState();
+  }
+
+  Future<void> _hydrateFromUiState() async {
+    try {
+      final uiState = await _uiRepo.load();
+      if (uiState == null) return;
+      state = state.copyWith(
+        cartItems: uiState.cartItems,
+        selectedTableId: uiState.selectedTableId,
+      );
+      if (uiState.selectedTableId != null) {
+        // Load lại đơn hiện tại cho bàn đang chọn.
+        await loadTableActiveOrder(uiState.selectedTableId!);
+      }
+    } catch (_) {
+      // Ignore hydrate errors to avoid breaking app startup.
+    }
+  }
+
+  void _schedulePersist({bool includeFilter = false, String? statusFilter, String? selectedDate}) {
+    _persistDebounce?.cancel();
+    final current = OrderUiState(
+      cartItems: state.cartItems,
+      selectedTableId: state.selectedTableId,
+      statusFilter: includeFilter ? statusFilter : null,
+      selectedDate: includeFilter ? selectedDate : null,
+    );
+    _persistDebounce = Timer(const Duration(milliseconds: 400), () {
+      _uiRepo.save(current);
+    });
+  }
 
   void selectTable(int? tableId) {
     state = state.copyWith(
@@ -91,6 +126,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
     if (tableId != null) {
       loadTableActiveOrder(tableId);
     }
+    _schedulePersist();
   }
 
   void addToCart(Map<String, dynamic> menuItem, {String? notes, int quantity = 1, List<Map<String, dynamic>>? options}) {
@@ -114,6 +150,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
         },
       ]);
     }
+    _schedulePersist();
   }
 
   void removeFromCart(int menuItemId, {List<Map<String, dynamic>>? options, String? notes}) {
@@ -121,6 +158,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
     if (idx < 0) return;
     final updated = List<Map<String, dynamic>>.from(state.cartItems)..removeAt(idx);
     state = state.copyWith(cartItems: updated);
+    _schedulePersist();
   }
 
   void updateCartQuantity(int menuItemId, int quantity, {List<Map<String, dynamic>>? options, String? notes}) {
@@ -133,6 +171,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
     final updated = List<Map<String, dynamic>>.from(state.cartItems);
     updated[idx] = {...updated[idx], 'quantity': quantity};
     state = state.copyWith(cartItems: updated);
+    _schedulePersist();
   }
 
   void updateCartItemNote(int menuItemId, String? note, {List<Map<String, dynamic>>? options, String? notes}) {
@@ -141,6 +180,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
     final updated = List<Map<String, dynamic>>.from(state.cartItems);
     updated[idx] = {...updated[idx], 'notes': note};
     state = state.copyWith(cartItems: updated);
+    _schedulePersist();
   }
 
   void updateCartItemOptions(int menuItemId, List<Map<String, dynamic>>? options, {List<Map<String, dynamic>>? currentOptions, String? currentNotes}) {
@@ -149,10 +189,12 @@ class OrderNotifier extends StateNotifier<OrderState> {
     final updated = List<Map<String, dynamic>>.from(state.cartItems);
     updated[idx] = {...updated[idx], 'options': options ?? []};
     state = state.copyWith(cartItems: updated);
+    _schedulePersist();
   }
 
   void clearCart() {
     state = state.copyWith(cartItems: [], selectedTableId: null);
+    _schedulePersist();
   }
 
   Future<Map<String, dynamic>?> submitOrder({String? notes, int? customerId}) async {
@@ -180,6 +222,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
       final order = await _repo.createOrder(data);
       clearCart();
       state = state.copyWith(isLoading: false, currentOrder: order);
+      _schedulePersist();
       return order;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -194,6 +237,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
       final data = await _repo.getOrders(status: status, date: date, discrepancy: discrepancy, deletedItem: deletedItem);
       if (!mounted) return;
       state = state.copyWith(orders: data, isLoading: false);
+      _schedulePersist(includeFilter: true, statusFilter: status, selectedDate: date);
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -398,7 +442,9 @@ class OrderNotifier extends StateNotifier<OrderState> {
   void startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (mounted) loadActiveOrders();
+      if (mounted && !state.isLoading) {
+        loadActiveOrders();
+      }
     });
     loadActiveOrders();
   }
@@ -411,10 +457,14 @@ class OrderNotifier extends StateNotifier<OrderState> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _persistDebounce?.cancel();
     super.dispose();
   }
 }
 
 final orderProvider = StateNotifierProvider<OrderNotifier, OrderState>((ref) {
-  return OrderNotifier(ref.watch(orderRepositoryProvider));
+  return OrderNotifier(
+    ref.watch(orderRepositoryProvider),
+    ref.watch(orderUiStateRepositoryProvider),
+  );
 });

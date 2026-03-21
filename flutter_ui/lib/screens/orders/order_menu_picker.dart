@@ -123,7 +123,7 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                             final name = (item['name'] as String? ?? '').toLowerCase();
                             return name.contains(query);
                           }).toList();
-                    return LayoutBuilder(
+                            return LayoutBuilder(
                       builder: (context, constraints) {
                         final width = constraints.maxWidth;
                         int crossAxisCount;
@@ -508,14 +508,16 @@ class _OrderMenuPickerState extends ConsumerState<OrderMenuPicker> {
                                                 selected: false,
                                                 selectedColor: AppTheme.primaryColor.withOpacity(0.12),
                                                 checkmarkColor: AppTheme.primaryColor,
-                                                onSelected: (_) {
-                                                  final selectedOption = {
-                                                    'id': o['id'],
-                                                    'name': o['name'],
-                                                    'extra_price': o['extra_price'],
-                                                  };
-                                                  handleAddWithOptions([selectedOption]);
-                                                },
+                                                onSelected: isAdding
+                                                    ? null
+                                                    : (_) {
+                                                        final selectedOption = {
+                                                          'id': o['id'],
+                                                          'name': o['name'],
+                                                          'extra_price': o['extra_price'],
+                                                        };
+                                                        handleAddWithOptions([selectedOption]);
+                                                      },
                                               );
                                             }).toList(),
                                           ),

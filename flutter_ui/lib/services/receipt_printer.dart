@@ -5,13 +5,15 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../repositories/receipt_template_repository.dart';
 import 'pdf_saver.dart';
 
 class ReceiptPrinter {
   static Future<void> print80mm({
     required Map<String, dynamic> invoice,
+    ReceiptTemplate? template,
   }) async {
-    final bytes = await _build80mmPdfBytes(invoice: invoice);
+    final bytes = await _build80mmPdfBytes(invoice: invoice, template: template);
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => bytes,
@@ -21,22 +23,25 @@ class ReceiptPrinter {
   /// Xây dựng PDF hoá đơn khổ 80mm để tái sử dụng cho in trực tiếp.
   static Future<Uint8List> build80mmPdfBytes({
     required Map<String, dynamic> invoice,
+    ReceiptTemplate? template,
   }) {
-    return _build80mmPdfBytes(invoice: invoice);
+    return _build80mmPdfBytes(invoice: invoice, template: template);
   }
 
   static Future<void> share80mm({
     required Map<String, dynamic> invoice,
+    ReceiptTemplate? template,
   }) async {
-    final bytes = await _build80mmPdfBytes(invoice: invoice);
+    final bytes = await _build80mmPdfBytes(invoice: invoice, template: template);
     await sharePdfBytes(bytes, filename: 'hoa-don-${invoice['invoice_number'] ?? ''}-80mm.pdf');
   }
 
   /// Lưu hoá đơn 80mm về máy qua dialog Save As.
   static Future<bool> save80mmToFile({
     required Map<String, dynamic> invoice,
+    ReceiptTemplate? template,
   }) async {
-    final bytes = await _build80mmPdfBytes(invoice: invoice);
+    final bytes = await _build80mmPdfBytes(invoice: invoice, template: template);
     return _saveBytesToFile(
       bytes: bytes,
       suggestedName: 'hoa-don-${invoice['invoice_number'] ?? ''}-80mm.pdf',
@@ -56,11 +61,20 @@ class ReceiptPrinter {
 
   static Future<Uint8List> _build80mmPdfBytes({
     required Map<String, dynamic> invoice,
+    ReceiptTemplate? template,
   }) async {
     final font = await PdfGoogleFonts.beVietnamProRegular();
     final fontBold = await PdfGoogleFonts.beVietnamProBold();
     final baseStyle = pw.TextStyle(font: font, fontSize: 10);
     final boldStyle = pw.TextStyle(font: fontBold, fontSize: 10, fontWeight: pw.FontWeight.bold);
+
+    final tpl = template ?? ReceiptTemplate.defaults();
+    final shopName = tpl.shopName.trim().isEmpty ? ReceiptTemplate.defaults().shopName : tpl.shopName.trim();
+    final shopAddress = tpl.shopAddress.trim().isEmpty ? ReceiptTemplate.defaults().shopAddress : tpl.shopAddress.trim();
+    final shopPhone = tpl.shopPhone.trim().isEmpty ? ReceiptTemplate.defaults().shopPhone : tpl.shopPhone.trim();
+    final receiptTitle = tpl.receiptTitle.trim().isEmpty ? ReceiptTemplate.defaults().receiptTitle : tpl.receiptTitle.trim();
+    final footerLine1 = tpl.footerLine1.trim().isEmpty ? ReceiptTemplate.defaults().footerLine1 : tpl.footerLine1.trim();
+    final footerLine2 = tpl.footerLine2.trim().isEmpty ? ReceiptTemplate.defaults().footerLine2 : tpl.footerLine2.trim();
 
     final doc = pw.Document();
 
@@ -78,16 +92,16 @@ class ReceiptPrinter {
                 child: pw.Column(
                   mainAxisSize: pw.MainAxisSize.min,
                   children: [
-                    pw.Text('HIÊN', style: boldStyle.copyWith(fontSize: 13)),
+                    pw.Text(shopName, style: boldStyle.copyWith(fontSize: 13)),
                     pw.SizedBox(height: 2),
-                    pw.Text('Ngọc Thạnh 2, Phước An, Gia Lai', style: baseStyle.copyWith(fontSize: 7)),
-                    pw.Text('ĐT: 034-226-3291', style: baseStyle.copyWith(fontSize: 7)),
+                    pw.Text(shopAddress, style: baseStyle.copyWith(fontSize: 7)),
+                    pw.Text('ĐT: $shopPhone', style: baseStyle.copyWith(fontSize: 7)),
                   ],
                 ),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text('HÓA ĐƠN THANH TOÁN', style: baseStyle.copyWith(fontSize: 8)),
+                child: pw.Text(receiptTitle, style: baseStyle.copyWith(fontSize: 8)),
               ),
               pw.SizedBox(height: 6),
               pw.Text('ĐH: ${order['order_number'] ?? ''}', style: baseStyle.copyWith(fontSize: 6)),
@@ -205,13 +219,13 @@ class ReceiptPrinter {
                   mainAxisSize: pw.MainAxisSize.min,
                   children: [
                     pw.Text(
-                      'Trà sữa Hiên',
+                      footerLine1,
                       style: boldStyle.copyWith(fontSize: 8),
                       textAlign: pw.TextAlign.center,
                     ),
                     pw.SizedBox(height: 2),
                     pw.Text(
-                      'Cảm ơn quý khách! Hẹn gặp lại!',
+                      footerLine2,
                       style: baseStyle.copyWith(fontSize: 7),
                       textAlign: pw.TextAlign.center,
                     ),

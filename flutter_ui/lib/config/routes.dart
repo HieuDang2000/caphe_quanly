@@ -14,6 +14,7 @@ import '../screens/staff/staff_screen.dart';
 import '../screens/inventory/inventory_screen.dart';
 import '../screens/customers/customer_screen.dart';
 import '../screens/reservations/reservation_screen.dart';
+import '../screens/settings/receipt_template_screen.dart';
 import '../widgets/app_shell.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -56,6 +57,10 @@ GoRouter createRouter(bool isLoggedIn) {
           GoRoute(path: '/inventory', builder: (_, _) => const InventoryScreen()),
           GoRoute(path: '/customers', builder: (_, _) => const CustomerScreen()),
           GoRoute(path: '/reservations', builder: (_, _) => const ReservationScreen()),
+          GoRoute(
+            path: '/settings/receipt-template',
+            builder: (_, _) => const ReceiptTemplateScreen(),
+          ),
         ],
       ),
     ],
